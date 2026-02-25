@@ -46,6 +46,9 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());                                 // 👈 NEW
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
+app.get('/', (_req, res) => {
+  return res.send("Civic Connect API is running. Please use the /api endpoints.");
+})
 // =============================
 // 📂 FILE UPLOAD — CLOUDINARY
 // =============================
