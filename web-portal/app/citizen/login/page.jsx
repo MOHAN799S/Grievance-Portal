@@ -18,7 +18,7 @@ const INDIAN_STATES = [
   "Delhi","Jammu and Kashmir","Ladakh","Lakshadweep","Puducherry"
 ];
 
-const BASE = "http://localhost:5000";
+const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 const inputBase = "w-full py-2.5 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none text-slate-900 placeholder-slate-400 transition-all text-sm shadow-sm";
 const inputErr  = "border-red-400 focus:border-red-400 focus:ring-red-400/15";
