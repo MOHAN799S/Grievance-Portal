@@ -7,15 +7,16 @@ const fs         = require("fs");
 const jwt        = require("jsonwebtoken");
 const bcrypt     = require("bcryptjs");
 const crypto     = require("crypto");
-const nodemailer = require("nodemailer");
 const cookieParser = require("cookie-parser");           // 👈 NEW
 const cloudinary   = require("cloudinary").v2;           // 👈 NEW
 const { CloudinaryStorage } = require("multer-storage-cloudinary"); // 👈 NEW
+const sgMail = require("@sendgrid/mail");
 
 require("dotenv").config();
 
 const app = express();
 
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 // =============================
 // ☁️ CLOUDINARY CONFIG
 // =============================
@@ -45,7 +46,7 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());                                 // 👈 NEW
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
+console.log("Loaded API Key:", process.env.SENDGRID_API_KEY);
 app.get('/', (_req, res) => {
   return res.send("Civic Connect API is running. Please use the /api endpoints.");
 })
@@ -123,36 +124,6 @@ mongoose
   .then(() => console.log("✅ MongoDB Connected {}", url))
   .catch((err) => { console.error("❌ DB Error:", err); process.exit(1); });
 
-// =============================
-// 📧 EMAIL TRANSPORTER
-// =============================
-// =============================
-// 📧 EMAIL TRANSPORTER (STABLE CONFIG)
-// =============================
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false, // TLS upgrade
-  pool: true, // connection pooling
-  maxConnections: 5,
-  maxMessages: 50,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS, // App Password
-  },
-  tls: {
-    rejectUnauthorized: false,
-  },
-});
-
-// Verify transporter on startup
-transporter.verify((error) => {
-  if (error) {
-    console.error("❌ SMTP Config Error:", error);
-  } else {
-    console.log("✅ SMTP Ready");
-  }
-});
 
 // =============================
 // 🔢 HELPERS
@@ -202,16 +173,16 @@ function decodeToken(authHeader) {
 // 🍪 COOKIE HELPER
 // =============================
 const COOKIE_OPTS = {
-  httpOnly: true,                                    // JS cannot read — XSS safe
-  secure:   process.env.NODE_ENV === "production",   // HTTPS only in prod
-  sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-  maxAge:   7 * 24 * 60 * 60 * 1000,               // 7 days (matches JWT)
+  httpOnly: true,
+  secure: true,
+  sameSite: "none",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
 const REFRESH_COOKIE_OPTS = {
   ...COOKIE_OPTS,
-  maxAge: 30 * 24 * 60 * 60 * 1000,               // 30 days
-  path:   "/api/auth/refresh",                      // only sent to refresh endpoint
+  maxAge: 30 * 24 * 60 * 60 * 1000,
+  path: "/api/auth/refresh",
 };
 
 /**
@@ -289,71 +260,23 @@ app.post("/api/auth/send-otp", async (req, res) => {
     await Otp.create({ email, mobileNumber, otp, expiresAt: new Date(Date.now() + 5 * 60 * 1000), attempts: 0 });
 
     try {
-  const info = await transporter.sendMail({
-    from: `"Civic Connect GKMC" <${process.env.EMAIL_USER}>`,
+  await sgMail.send({
     to: email,
+    from: process.env.SENDGRID_VERIFIED_EMAIL, // MUST match verified sender
     subject: "OTP Verification – Civic Connect",
     html: `
-  <div style="margin:0;padding:0;background-color:#f3f4f6;font-family:Arial,Helvetica,sans-serif;">
-    <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:20px auto;background:#ffffff;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,0.08);overflow:hidden;">
-      
-      <!-- Header -->
-      <tr>
-        <td style="background-color:#1e3a8a;padding:20px;text-align:center;color:#ffffff;">
-          <h1 style="margin:0;font-size:20px;letter-spacing:1px;">
-            Civic Connect – Municipal Services Portal
-          </h1>
-          <p style="margin:5px 0 0;font-size:13px;opacity:0.9;">
-            Government Grievance & Citizen Service Platform
-          </p>
-        </td>
-      </tr>
-
-      <!-- Body -->
-      <tr>
-        <td style="padding:30px 25px;text-align:center;">
-          <h2 style="margin:0 0 15px;color:#111827;font-size:18px;">
-            OTP Verification Code
-          </h2>
-
-          <p style="font-size:14px;color:#374151;margin-bottom:20px;">
-            Please use the following One-Time Password (OTP) to complete your verification process.
-          </p>
-
-          <!-- OTP Box -->
-          <div style="display:inline-block;background:#f1f5f9;border:2px dashed #1e3a8a;
-                      padding:15px 30px;font-size:32px;font-weight:bold;
-                      letter-spacing:8px;color:#1e3a8a;border-radius:6px;">
-            ${otp}
-          </div>
-
-          <p style="margin-top:20px;font-size:13px;color:#6b7280;">
-            This code is valid for <strong>5 minutes</strong> only.
-          </p>
-
-          <p style="margin-top:10px;font-size:12px;color:#9ca3af;">
-            Do not share this code with anyone. Government officials will never ask for your OTP.
-          </p>
-        </td>
-      </tr>
-
-      <!-- Footer -->
-      <tr>
-        <td style="background-color:#f9fafb;padding:15px;text-align:center;font-size:12px;color:#6b7280;">
-          © ${new Date().getFullYear()} Civic Connect Portal<br/>
-          This is an automated system-generated email. Please do not reply.
-        </td>
-      </tr>
-
-    </table>
-  </div>
-`,
+      <div style="font-family:Arial,sans-serif">
+        <h2>OTP Verification</h2>
+        <div style="font-size:30px;font-weight:bold">${otp}</div>
+        <p>This OTP is valid for 5 minutes.</p>
+      </div>
+    `,
   });
 
-  console.log("📧 Email sent:", info.messageId);
+  console.log("📧 OTP email sent");
 
 } catch (mailErr) {
-  console.error("❌ Mail Error:", mailErr.response || mailErr);
+  console.error("❌ SendGrid Error:", mailErr.response?.body || mailErr);
   return res.status(500).json({
     success: false,
     message: "Email delivery failed",
