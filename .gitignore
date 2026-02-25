@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Next.js / Frontend production build
+/.next/
+/out/
+/build/
+.vercel/
+
+# Backend Uploads (Don't push user images/audio to GitHub)
+backend/uploads/
+uploads/
+
+# Environment Variables (Protect your passwords & API keys)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+
+# IDE / Editor System Files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+temp/
