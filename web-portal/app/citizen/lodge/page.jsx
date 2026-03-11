@@ -17,92 +17,148 @@ import {
   Shield,
   User,
   Navigation,
-  Info,
   AlertCircle,
-  Clock,
   Upload,
   Zap,
+  Ban,
+  Clock,
 } from "lucide-react";
 import Link from "next/link";
 
 // ── Kakinada Municipal Corporation — official wards & localities ONLY ────────
 const LOCATIONS = [
-  // Zone 1 — Suryaraopeta
-  "Suryaraopeta",
-  "Jagannaickpur",
-  "Raja Rao Peta",
-  "Bhanugudi",
-  "Old Town",
-  "Rajah Street",
-  "Main Road",
-  // Zone 2 — Gandhi Nagar
-  "Gandhi Nagar",
-  "Ashok Nagar",
-  "Nethaji Nagar",
-  "Srinivasa Nagar",
-  "TNGO Colony",
-  "Shankar Vilas",
-  "Collector's Colony",
-  // Zone 3 — New Town
-  "New Town",
-  "Bank Colony",
-  "Drivers Colony",
-  "FCI Colony",
-  "Burma Colony",
-  "Dwaraka Nagar",
-  "Ayodhya Nagar",
-  // Zone 4 — Port & Industrial
-  "Kakinada Port Area",
-  "Kakinada Industrial Area",
-  "Fishing Harbour",
-  "Dairy Farm",
-  "Auto Nagar",
-  "Kaleswara Rao Nagar",
-  // Zone 5 — Ramanayyapeta
-  "Ramanayyapeta",
-  "Rama Rao Peta",
-  "Kondayya Palem",
-  "Ganganapalle",
-  "Gudari Gunta",
-  "Indrapalem",
-  // Zone 6 — Sarpavaram & Uppada
-  "Sarpavaram",
-  "Uppada",
-  "Kaikavolu",
-  "Kothuru",
-  "Thammavaram",
-  "Thimmapuram",
-  // Zone 7 — Vivekananda & JNTU
-  "Vivekananda Street",
-  "JR NTR Road",
-  "JNTU Kakinada Area",
-  "Govt General Hospital Area",
-  "APSP Camp",
-  // Other KMC-recognised localities
-  "Kakinada Beach Road",
-  "Kakinada Bazar",
-  "Anjaneya Nagar",
+  "Suryaraopeta","Jagannaickpur","Raja Rao Peta","Bhanugudi","Old Town","Rajah Street","Main Road",
+  "Gandhi Nagar","Ashok Nagar","Nethaji Nagar","Srinivasa Nagar","TNGO Colony","Shankar Vilas","Collector's Colony",
+  "New Town","Bank Colony","Drivers Colony","FCI Colony","Burma Colony","Dwaraka Nagar","Ayodhya Nagar",
+  "Kakinada Port Area","Kakinada Industrial Area","Fishing Harbour","Dairy Farm","Auto Nagar","Kaleswara Rao Nagar",
+  "Ramanayyapeta","Rama Rao Peta","Kondayya Palem","Ganganapalle","Gudari Gunta","Indrapalem",
+  "Sarpavaram","Uppada","Kaikavolu","Kothuru","Thammavaram","Thimmapuram",
+  "Vivekananda Street","JR NTR Road","JNTU Kakinada Area","Govt General Hospital Area","APSP Camp",
+  "Kakinada Beach Road","Kakinada Bazar","Anjaneya Nagar",
 ];
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-// ── Submission Flow States ───────────────────────────────────────────────────
-const SUBMISSION_STAGES = {
-  IDLE: "idle",
-  VALIDATING: "validating",
-  UPLOADING: "uploading",
-  ANALYZING: "analyzing",
-  PROCESSING_AI: "processing_ai",
-  SUCCESS: "success",
-  ERROR: "error",
+// ── Timeout per input mode (ms) ───────────────────────────────────────────────
+// audio+image needs up to 3 Whisper attempts (~3 min) + BLIP (~1 min) = 4 min
+// Keep frontend timeout slightly above Express timeout
+const MODE_TIMEOUT_MS = {
+  "text":        35_000,
+  "image":       90_000,
+  "audio":       450_000,  // 7.5 min
+  "text+image":  60_000,
+  "audio+image": 510_000,  // 8.5 min
 };
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Submission Flow States ────────────────────────────────────────────────────
+const SUBMISSION_STAGES = {
+  IDLE:          "idle",
+  VALIDATING:    "validating",
+  UPLOADING:     "uploading",
+  ANALYZING:     "analyzing",
+  PROCESSING_AI: "processing_ai",
+  SUCCESS:       "success",
+  ERROR:         "error",
+};
+
+// ── Timing config per mode ────────────────────────────────────────────────────
+const MODE_TIMING = {
+  "text": {
+    badge:    "⚡ Fast",
+    estimate: "~10–20 seconds",
+    color:    "text-green-700",
+    bg:       "bg-green-50",
+    border:   "border-green-200",
+    overlay:  "Classifying your grievance — almost done…",
+    hint:     "Text-only is the fastest mode. AI reads and classifies in seconds.",
+    warn:     null,
+  },
+  "image": {
+    badge:    "🖼️ Moderate",
+    estimate: "~30–60 seconds",
+    color:    "text-amber-700",
+    bg:       "bg-amber-50",
+    border:   "border-amber-200",
+    overlay:  "BLIP + EasyOCR are scanning your image for civic content…",
+    hint:     "Image scanning (BLIP + OCR) takes around 30–60 seconds.",
+    warn:     null,
+  },
+  "audio": {
+    badge:    "🎤 Slow",
+    estimate: "~2–4 minutes",
+    color:    "text-orange-700",
+    bg:       "bg-orange-50",
+    border:   "border-orange-200",
+    overlay:  "Whisper AI is transcribing your voice in Telugu / Hindi / English…",
+    hint:     "Whisper tries EN → TE → HI until it finds a clean transcription.",
+    warn:     "⚠️ Do not close or refresh this tab while voice is being processed.",
+  },
+  "text+image": {
+    badge:    "🖼️ Moderate",
+    estimate: "~20–40 seconds",
+    color:    "text-amber-700",
+    bg:       "bg-amber-50",
+    border:   "border-amber-200",
+    overlay:  "Verifying image GPS location and classifying your text…",
+    hint:     "Text is instant. Image GPS verification adds ~20–40 seconds.",
+    warn:     null,
+  },
+  "audio+image": {
+    badge:    "⏳ Slowest",
+    estimate: "~3–5 minutes",
+    color:    "text-red-700",
+    bg:       "bg-red-50",
+    border:   "border-red-200",
+    overlay:  "Running Whisper transcription + BLIP image scan simultaneously…",
+    hint:     "Both Whisper (voice) and BLIP (image) run together — expect 3–5 min on CPU.",
+    warn:     "⚠️ This is the slowest mode. Keep this tab open — do not refresh.",
+  },
+};
+
+// ── Valid input combinations ──────────────────────────────────────────────────
+function resolveInputMode(hasText, hasAudio, hasImage) {
+  if (!hasText && !hasAudio && !hasImage)
+    return { valid: false, mode: null, conflictError: null };
+  if (hasText && hasAudio)
+    return {
+      valid: false, mode: null,
+      conflictError: "Text and audio cannot be submitted together. Please use one description method — either type your grievance or record a voice note.",
+    };
+  if (hasText  && !hasImage && !hasAudio) return { valid: true, mode: "text",        conflictError: null };
+  if (hasAudio && !hasImage && !hasText)  return { valid: true, mode: "audio",       conflictError: null };
+  if (hasImage && !hasText  && !hasAudio) return { valid: true, mode: "image",       conflictError: null };
+  if (hasText  &&  hasImage && !hasAudio) return { valid: true, mode: "text+image",  conflictError: null };
+  if (hasAudio &&  hasImage && !hasText)  return { valid: true, mode: "audio+image", conflictError: null };
+  return { valid: false, mode: null, conflictError: "Invalid input combination." };
+}
+
+const MODE_META = {
+  "text":        { label: "Text Only",        desc: "Your typed description will be analysed." },
+  "audio":       { label: "Audio Only",       desc: "Your voice note will be transcribed and analysed." },
+  "image":       { label: "Image Only",       desc: "Text will be extracted from your image and analysed." },
+  "text+image":  { label: "Text + Evidence",  desc: "Text is the grievance. Image is location evidence." },
+  "audio+image": { label: "Audio + Evidence", desc: "Audio is the grievance. Image is location evidence." },
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function FieldNote({ text }) {
+  return <p className="text-xs text-slate-500 font-medium mt-2.5">💡 {text}</p>;
+}
+
+function TimingNote({ mode }) {
+  const t = MODE_TIMING[mode];
+  if (!t) return null;
   return (
-    <p className="text-xs text-slate-500 font-medium mt-2.5">
-      💡 {text}
-    </p>
+    <div className={`mt-3 rounded-xl border px-3 py-2.5 space-y-1 ${t.bg} ${t.border}`}>
+      <div className="flex items-center gap-2">
+        <Clock className={`w-3.5 h-3.5 flex-shrink-0 ${t.color}`} />
+        <p className={`text-xs font-bold ${t.color}`}>
+          {t.badge} &nbsp;·&nbsp; Expected time: <span className="underline decoration-dotted">{t.estimate}</span>
+        </p>
+      </div>
+      <p className={`text-xs leading-snug pl-5 ${t.color} opacity-90`}>{t.hint}</p>
+      {t.warn && <p className={`text-xs font-semibold leading-snug pl-5 ${t.color}`}>{t.warn}</p>}
+    </div>
   );
 }
 
@@ -127,53 +183,167 @@ function AIRow({ label, value }) {
   );
 }
 
-// ── Submission Flow Indicator ────────────────────────────────────────────────
-function SubmissionFlowIndicator({ stage }) {
-  const stages = [
-    { key: SUBMISSION_STAGES.VALIDATING, label: "Validating", icon: CheckCircle2 },
-    { key: SUBMISSION_STAGES.UPLOADING, label: "Uploading", icon: Upload },
-    { key: SUBMISSION_STAGES.ANALYZING, label: "Analyzing", icon: Zap },
-    { key: SUBMISSION_STAGES.PROCESSING_AI, label: "AI Processing", icon: Loader2 },
-  ];
+// ── Elapsed Timer — live seconds counter shown in overlay ─────────────────────
+function ElapsedTimer({ running }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!running) { setElapsed(0); return; }
+    const id = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [running]);
+  if (!running) return null;
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  return (
+    <p className="text-xs text-slate-400 font-mono text-center mt-2">
+      ⏱ {m > 0 ? `${m}m ` : ""}{s}s elapsed
+    </p>
+  );
+}
 
-  const stageOrder = Object.values(SUBMISSION_STAGES).slice(0, 4);
-  const currentIndex = stageOrder.indexOf(stage);
+// ── Input Mode Indicator ──────────────────────────────────────────────────────
+function InputModeIndicator({ hasText, hasAudio, hasImage }) {
+  const { mode, conflictError } = resolveInputMode(hasText, hasAudio, hasImage);
+  if (!hasText && !hasAudio && !hasImage) return null;
+
+  if (conflictError) {
+    return (
+      <div className="rounded-2xl border-2 border-red-200 bg-red-50 p-4">
+        <div className="flex items-start gap-3">
+          <Ban className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-bold text-red-800">Invalid Combination</p>
+            <p className="text-xs text-red-600 mt-1">{conflictError}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const meta   = MODE_META[mode];
+  const timing = MODE_TIMING[mode];
+  const rows   = [];
+  if (mode === "text")        rows.push({ dot: "bg-blue-500",  label: "Text",  role: "Grievance Description" });
+  else if (mode === "audio")  rows.push({ dot: "bg-blue-500",  label: "Audio", role: "Grievance Description → will be transcribed" });
+  else if (mode === "image")  rows.push({ dot: "bg-blue-500",  label: "Image", role: "Grievance Description → text will be extracted" });
+  else if (mode === "text+image") {
+    rows.push({ dot: "bg-blue-500",  label: "Text",  role: "Grievance Description" });
+    rows.push({ dot: "bg-amber-500", label: "Image", role: "Supporting Evidence (location verified via EXIF)" });
+  } else if (mode === "audio+image") {
+    rows.push({ dot: "bg-blue-500",  label: "Audio", role: "Grievance Description → will be transcribed" });
+    rows.push({ dot: "bg-amber-500", label: "Image", role: "Supporting Evidence (location verified via EXIF)" });
+  }
 
   return (
-    <div className="space-y-3">
-      {stages.map((s, idx) => {
-        const isActive = stage === s.key;
-        const isComplete = stageOrder.indexOf(s.key) < currentIndex;
-        const Icon = s.icon;
-
-        return (
-          <div key={s.key} className="flex items-center gap-3">
-            <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all ${
-                isComplete
-                  ? "bg-green-100 text-green-700"
-                  : isActive
-                  ? "bg-blue-100 text-blue-700 ring-2 ring-blue-300"
-                  : "bg-slate-100 text-slate-400"
-              }`}
-            >
-              {isComplete ? <CheckCircle2 className="w-5 h-5" /> : isActive ? <Loader2 className="w-5 h-5 animate-spin" /> : <Icon className="w-5 h-5" />}
-            </div>
-            <span
-              className={`text-sm font-medium ${
-                isActive ? "text-blue-700 font-bold" : isComplete ? "text-green-700" : "text-slate-400"
-              }`}
-            >
-              {s.label}
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">Input Mode</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          {timing && (
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${timing.bg} ${timing.border} ${timing.color}`}>
+              {timing.badge} · {timing.estimate}
+            </span>
+          )}
+          <span className="text-xs font-bold px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full">
+            {meta.label}
+          </span>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {rows.map((r, i) => (
+          <div key={i} className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-lg border border-slate-100">
+            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${r.dot}`} />
+            <span className="text-sm text-slate-700">
+              <span className="font-bold text-slate-900">{r.label}</span>
+              <span className="text-slate-500"> → {r.role}</span>
             </span>
           </div>
-        );
-      })}
+        ))}
+      </div>
+      <p className="text-xs text-slate-500">{meta.desc}</p>
+      {timing && (
+        <div className={`rounded-xl border px-3 py-2.5 space-y-1 ${timing.bg} ${timing.border}`}>
+          <div className="flex items-center gap-2">
+            <Clock className={`w-3.5 h-3.5 flex-shrink-0 ${timing.color}`} />
+            <p className={`text-xs font-bold ${timing.color}`}>Processing estimate: {timing.estimate}</p>
+          </div>
+          <p className={`text-xs leading-snug pl-5 ${timing.color} opacity-90`}>{timing.hint}</p>
+          {timing.warn && <p className={`text-xs font-semibold leading-snug pl-5 ${timing.color}`}>{timing.warn}</p>}
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Error Banner ─────────────────────────────────────────────────────────────
+// ── Submission Flow Indicator ─────────────────────────────────────────────────
+function SubmissionFlowIndicator({ stage, inputMode }) {
+  const stageDesc = {
+    [SUBMISSION_STAGES.VALIDATING]:    "Checking your inputs and session token…",
+    [SUBMISSION_STAGES.UPLOADING]:     "Sending your data to the server…",
+    [SUBMISSION_STAGES.ANALYZING]:     MODE_TIMING[inputMode]?.overlay ?? "AI is analysing your input…",
+    [SUBMISSION_STAGES.PROCESSING_AI]: "BERT is classifying category, urgency & priority score…",
+  };
+  const stages = [
+    { key: SUBMISSION_STAGES.VALIDATING,    label: "Validating",    icon: CheckCircle2 },
+    { key: SUBMISSION_STAGES.UPLOADING,     label: "Uploading",     icon: Upload },
+    { key: SUBMISSION_STAGES.ANALYZING,     label: "Analyzing",     icon: Zap },
+    { key: SUBMISSION_STAGES.PROCESSING_AI, label: "AI Processing", icon: Loader2 },
+  ];
+  const stageOrder   = stages.map((s) => s.key);
+  const currentIndex = stageOrder.indexOf(stage);
+  const timing       = MODE_TIMING[inputMode];
+  const isProcessing = stage === SUBMISSION_STAGES.ANALYZING || stage === SUBMISSION_STAGES.PROCESSING_AI;
+
+  return (
+    <div className="space-y-4">
+      {stages.map((s) => {
+        const isActive   = stage === s.key;
+        const isComplete = stageOrder.indexOf(s.key) < currentIndex;
+        const Icon       = s.icon;
+        return (
+          <div key={s.key} className="flex items-start gap-3">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all flex-shrink-0 ${
+              isComplete ? "bg-green-100 text-green-700"
+              : isActive  ? "bg-blue-100 text-blue-700 ring-2 ring-blue-300"
+              : "bg-slate-100 text-slate-400"
+            }`}>
+              {isComplete ? <CheckCircle2 className="w-5 h-5" /> :
+               isActive   ? <Loader2     className="w-5 h-5 animate-spin" /> :
+                            <Icon        className="w-5 h-5" />}
+            </div>
+            <div className="flex-1 pt-2">
+              <p className={`text-sm font-bold leading-none ${
+                isActive ? "text-blue-700" : isComplete ? "text-green-700" : "text-slate-400"
+              }`}>{s.label}</p>
+              {isActive && (
+                <p className="text-xs text-slate-500 mt-1 leading-snug">{stageDesc[s.key]}</p>
+              )}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Live elapsed timer — only shown during AI processing stages */}
+      <ElapsedTimer running={isProcessing} />
+
+      {/* Timing hint box */}
+      {timing && (
+        <div className={`rounded-xl border px-4 py-3 ${timing.bg} ${timing.border}`}>
+          <div className="flex items-start gap-2">
+            <Clock className={`w-4 h-4 flex-shrink-0 mt-0.5 ${timing.color}`} />
+            <div>
+              <p className={`text-xs font-bold ${timing.color}`}>{timing.badge} · {timing.estimate}</p>
+              <p className={`text-xs mt-0.5 leading-snug ${timing.color} opacity-80`}>{timing.hint}</p>
+              {timing.warn && <p className={`text-xs font-semibold mt-1 ${timing.color}`}>{timing.warn}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Error Banner ──────────────────────────────────────────────────────────────
 function ErrorBanner({ error, onDismiss }) {
   return (
     <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex items-start gap-3">
@@ -182,162 +352,94 @@ function ErrorBanner({ error, onDismiss }) {
         <h4 className="font-bold text-red-900 text-sm">Submission Failed</h4>
         <p className="text-red-700 text-sm mt-1">{error}</p>
       </div>
-      <button
-        onClick={onDismiss}
-        className="text-red-400 hover:text-red-600 transition-colors flex-shrink-0"
-      >
+      <button onClick={onDismiss} className="text-red-400 hover:text-red-600 transition-colors flex-shrink-0">
         <X className="w-4 h-4" />
       </button>
     </div>
   );
 }
 
-// ── Success Screen ───────────────────────────────────────────────────────────
+// ── Success Screen ────────────────────────────────────────────────────────────
 function SuccessScreen({ successData, prediction, onReset }) {
-  const priorityColor =
-    successData.priority === "Critical" || successData.priority === "Immediate"
-      ? "text-red-600"
-      : successData.priority === "High"
-      ? "text-orange-500"
-      : successData.priority === "Medium"
-      ? "text-amber-500"
-      : "text-green-600";
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
-        {/* Success Header */}
         <div className="bg-white rounded-3xl border border-green-200 shadow-xl p-8 text-center mb-6">
           <div className="flex justify-center mb-4">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center animate-pulse">
               <CheckCircle2 className="w-8 h-8 text-green-600" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">
-            Grievance Registered
-          </h1>
-          <p className="text-slate-600 text-base">
-            Your complaint has been submitted successfully and is being reviewed.
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">Grievance Registered</h1>
+          <p className="text-slate-600 text-base">Your complaint has been submitted and is being reviewed.</p>
+        </div>
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-lg p-6 mb-6 text-center">
+          <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">Reference ID</p>
+          <p className="text-2xl font-mono font-bold text-blue-600 mb-3">
+            KMC-{successData._id.slice(-8).toUpperCase()}
           </p>
+          <p className="text-sm text-slate-600">Save this ID to track your grievance status</p>
         </div>
-
-        {/* Reference ID Card */}
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-lg p-6 mb-6">
-          <div className="text-center">
-            <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">
-              Reference ID
-            </p>
-            <p className="text-2xl font-mono font-bold text-blue-600 mb-3">
-              KMC-{successData._id.slice(-8).toUpperCase()}
-            </p>
-            <p className="text-sm text-slate-600">
-              Save this ID to track your grievance status
-            </p>
-          </div>
-        </div>
-
-        {/* Details Grid */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-lg p-6 mb-6">
           <h3 className="font-bold text-slate-900 mb-4">Grievance Details</h3>
           <div className="space-y-3">
-            <AIRow label="Area/Ward" value={successData.area} />
-            <AIRow label="Status" value={successData.status} />
-
-            {prediction?.category && (
-              <AIRow label="Category" value={prediction.category} />
-            )}
-            {prediction?.urgency && (
-              <AIRow label="Urgency" value={prediction.urgency} />
-            )}
-
-            {(successData.latitude || successData.longitude) && (
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                <p className="text-xs font-semibold text-blue-700 mb-1">
-                  📍 GPS Location
-                </p>
-                <p className="text-sm font-mono text-slate-900">
-                  Lat: {successData.latitude} · Lng: {successData.longitude}
+            <AIRow label="Area/Ward"  value={successData.area} />
+            <AIRow label="Status"     value={successData.status} />
+            <AIRow label="Input Mode" value={successData.inputMode ?? "—"} />
+            {prediction?.category && <AIRow label="Category" value={prediction.category} />}
+            {prediction?.urgency  && <AIRow label="Urgency"  value={prediction.urgency}  />}
+            {prediction?.locationStatus && (
+              <div className={`p-3 rounded-lg border flex items-center gap-2 ${
+                prediction.locationStatus === "valid" ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"
+              }`}>
+                <div className={`w-2 h-2 rounded-full ${prediction.locationStatus === "valid" ? "bg-green-500" : "bg-amber-500"}`} />
+                <p className={`text-xs font-bold ${prediction.locationStatus === "valid" ? "text-green-700" : "text-amber-700"}`}>
+                  Evidence Location:{" "}
+                  {prediction.locationStatus === "valid"
+                    ? "Verified — inside Kakinada jurisdiction"
+                    : "Unverified — GPS outside Kakinada or missing"}
                 </p>
               </div>
             )}
           </div>
         </div>
-
-        {/* AI Assessment */}
         {prediction && (
           <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-3xl border border-purple-200 shadow-lg p-6 mb-6">
             <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <Zap className="w-5 h-5 text-purple-600" />
-              AI Assessment
+              <Zap className="w-5 h-5 text-purple-600" />AI Assessment
             </h3>
             <div className="space-y-3">
-              {prediction.categoryConfidence != null && (
-                <AIRow
-                  label="Category Confidence"
-                  value={`${Math.round(prediction.categoryConfidence * 100)}%`}
-                />
-              )}
-              {prediction.urgencyConfidence != null && (
-                <AIRow
-                  label="Urgency Confidence"
-                  value={`${Math.round(prediction.urgencyConfidence * 100)}%`}
-                />
-              )}
-              {prediction.priorityScore != null && (
-                <AIRow
-                  label="Priority Score"
-                  value={`${Math.round(prediction.priorityScore * 100)}%`}
-                />
-              )}
-              {prediction.language && (
-                <AIRow label="Detected Language" value={prediction.language} />
-              )}
+              {prediction.categoryConfidence != null && <AIRow label="Category Confidence" value={`${Math.round(prediction.categoryConfidence * 100)}%`} />}
+              {prediction.urgencyConfidence  != null && <AIRow label="Urgency Confidence"  value={`${Math.round(prediction.urgencyConfidence  * 100)}%`} />}
+              {prediction.priorityScore      != null && <AIRow label="Priority Score"      value={`${Math.round(prediction.priorityScore      * 100)}%`} />}
+              {prediction.language && <AIRow label="Detected Language" value={prediction.language} />}
             </div>
-
             {prediction.explanation?.finalReason && (
               <div className="mt-4 p-4 bg-white rounded-lg border border-slate-200">
-                <p className="text-xs text-slate-600 font-semibold uppercase mb-2">
-                  AI Reasoning
-                </p>
-                <p className="text-sm text-slate-900 leading-relaxed">
-                  {prediction.explanation.finalReason}
-                </p>
+                <p className="text-xs text-slate-600 font-semibold uppercase mb-2">AI Reasoning</p>
+                <p className="text-sm text-slate-900 leading-relaxed">{prediction.explanation.finalReason}</p>
               </div>
             )}
           </div>
         )}
-
-        {/* Action Buttons */}
         <div className="flex flex-col gap-3 sm:flex-row">
-          <button
-            onClick={onReset}
-            className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-sm transition-all hover:shadow-lg shadow-md"
-          >
+          <button onClick={onReset} className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-sm transition-all hover:shadow-lg shadow-md">
             Lodge Another Complaint
           </button>
-          <Link
-            href="/citizen/dashboard"
-            className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-2xl font-bold text-sm transition-all hover:shadow-lg text-center shadow-sm"
-          >
+          <Link href="/citizen/history" className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-2xl font-bold text-sm transition-all hover:shadow-lg text-center shadow-sm">
             View Dashboard
           </Link>
         </div>
-
-        {/* Footer */}
         <div className="text-center mt-6 pt-6 border-t border-slate-200">
-          <p className="text-xs text-slate-500">
-            Reviewed within 24 hours · Helpline: 1800-599-4116
-          </p>
-          <p className="text-xs text-slate-400 mt-1">
-            Government of Andhra Pradesh — East Godavari District
-          </p>
+          <p className="text-xs text-slate-500">Reviewed within 24 hours · Helpline: 1800-599-4116</p>
+          <p className="text-xs text-slate-400 mt-1">Government of Andhra Pradesh — East Godavari District</p>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Auth Gate ────────────────────────────────────────────────────────────────
+// ── Auth Gate ─────────────────────────────────────────────────────────────────
 function AuthGate() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-50 flex items-center justify-center p-4">
@@ -348,68 +450,56 @@ function AuthGate() {
         <h1 className="text-3xl font-bold text-slate-900 mb-2">CivicConnect</h1>
         <p className="text-slate-600 mb-8">Municipal Corp</p>
         <div className="bg-white rounded-2xl border border-slate-100 shadow-lg p-8 mb-6">
-          <h2 className="font-bold text-lg text-slate-900 mb-3">
-            Sign In Required
-          </h2>
-          <p className="text-sm text-slate-600">
-            Only registered citizens can lodge grievances. Please sign in to
-            continue.
-          </p>
+          <h2 className="font-bold text-lg text-slate-900 mb-3">Sign In Required</h2>
+          <p className="text-sm text-slate-600">Only registered citizens can lodge grievances. Please sign in to continue.</p>
         </div>
         <div className="flex flex-col gap-3">
-          <Link
-            href="/citizen/login"
-            className="py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-all"
-          >
-            Sign In as Citizen
-          </Link>
-          <Link
-            href="/"
-            className="py-3 bg-slate-200 hover:bg-slate-300 text-slate-900 rounded-xl font-bold text-sm transition-all"
-          >
-            Back to Home
-          </Link>
+          <Link href="/citizen/login" className="py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-all">Sign In as Citizen</Link>
+          <Link href="/" className="py-3 bg-slate-200 hover:bg-slate-300 text-slate-900 rounded-xl font-bold text-sm transition-all">Back to Home</Link>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Main Component ───────────────────────────────────────────────────────────
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function SmartLodge() {
   const router = useRouter();
-  const [authChecked, setAuthChecked] = useState(false);
-  const [isAuthed, setIsAuthed] = useState(false);
-  const [name, setName] = useState("");
-  const [area, setArea] = useState(LOCATIONS[0]);
+
+  const [authChecked,    setAuthChecked]    = useState(false);
+  const [isAuthed,       setIsAuthed]       = useState(false);
+  const [name,           setName]           = useState("");
+  const [area,           setArea]           = useState(LOCATIONS[0]);
   const [addressDetails, setAddressDetails] = useState("");
-  const [fetchingAddr, setFetchingAddr] = useState(false);
-  const [addrFetched, setAddrFetched] = useState(false);
-  const [text, setText] = useState("");
-  const [audioBlob, setAudioBlob] = useState(null);
-  const [file, setFile] = useState(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [fetchingAddr,   setFetchingAddr]   = useState(false);
+  const [addrFetched,    setAddrFetched]    = useState(false);
 
-  // ── NEW: Submission Flow State ─────────────────────────────────────────────
+  const [text,          setText]          = useState("");
+  const [audioBlob,     setAudioBlob]     = useState(null);
+  const [audioMimeType, setAudioMimeType] = useState("audio/webm");
+  const [file,          setFile]          = useState(null);
+  const [isRecording,   setIsRecording]   = useState(false);
+  const [isCameraOpen,  setIsCameraOpen]  = useState(false);
+
   const [submissionStage, setSubmissionStage] = useState(SUBMISSION_STAGES.IDLE);
-  const [successData, setSuccessData] = useState(null);
-  const [prediction, setPrediction] = useState(null);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [successData,     setSuccessData]     = useState(null);
+  const [prediction,      setPrediction]      = useState(null);
+  const [errorMessage,    setErrorMessage]    = useState("");
+  const [geoData,         setGeoData]         = useState({ lat: null, lng: null, address: "", time: "" });
 
-  // GPS Data
-  const [geoData, setGeoData] = useState({ lat: null, lng: null, address: "", time: "" });
-
-  // Refs
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const streamRef = useRef(null);
+  const videoRef         = useRef(null);
+  const canvasRef        = useRef(null);
+  const streamRef        = useRef(null);
   const mediaRecorderRef = useRef(null);
-  const chunksRef = useRef([]);
+  const chunksRef        = useRef([]);
 
-  // ── Auth Check ─────────────────────────────────────────────────────────────
+  const hasText  = text.trim().length > 0;
+  const hasAudio = !!audioBlob;
+  const hasImage = !!file;
+  const { valid: inputValid, mode: inputMode, conflictError } = resolveInputMode(hasText, hasAudio, hasImage);
+
   useEffect(() => {
-    const token = localStorage.getItem("citizenToken");
+    const token   = localStorage.getItem("citizenToken");
     const userStr = localStorage.getItem("citizen_user");
     if (token && userStr) {
       try {
@@ -421,225 +511,132 @@ export default function SmartLodge() {
     setAuthChecked(true);
   }, []);
 
-  // ── My Location ────────────────────────────────────────────────────────────
   const handleFetchAddress = () => {
-    if (!navigator.geolocation) {
-      setErrorMessage("Geolocation is not supported on this device.");
-      return;
-    }
-
+    if (!navigator.geolocation) { setErrorMessage("Geolocation not supported."); return; }
     setFetchingAddr(true);
     setErrorMessage("");
-
     navigator.geolocation.getCurrentPosition(
       async ({ coords: { latitude, longitude } }) => {
         try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
-          );
+          const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
           const data = await res.json();
-          const a = data.address || {};
-          const parts = [
-            a.house_number,
-            a.road || a.pedestrian,
-            a.suburb || a.neighbourhood,
-          ].filter(Boolean);
+          const a    = data.address || {};
+          const parts = [a.house_number, a.road || a.pedestrian, a.suburb || a.neighbourhood].filter(Boolean);
           setAddressDetails(parts.join(", ") || data.display_name);
-          setGeoData({
-            lat: latitude.toFixed(6),
-            lng: longitude.toFixed(6),
-            address: data.display_name,
-            time: new Date().toLocaleString("en-IN", {
-              dateStyle: "full",
-              timeStyle: "medium",
-            }),
-          });
+          setGeoData({ lat: latitude.toFixed(6), lng: longitude.toFixed(6), address: data.display_name, time: new Date().toLocaleString("en-IN", { dateStyle: "full", timeStyle: "medium" }) });
           setAddrFetched(true);
-        } catch {
-          setErrorMessage("Failed to fetch address. Please try again.");
-        } finally {
-          setFetchingAddr(false);
-        }
+        } catch { setErrorMessage("Failed to fetch address."); }
+        finally  { setFetchingAddr(false); }
       },
-      () => {
-        setErrorMessage("Location access denied. Please enable location permissions.");
-        setFetchingAddr(false);
-      },
-      { timeout: 10000 }
+      () => { setErrorMessage("Location access denied."); setFetchingAddr(false); },
+      { timeout: 10000 },
     );
   };
 
-  // ── Geo-Camera ──────────────────────────────────────────────────────────────
   const startCamera = async () => {
-    setIsCameraOpen(true);
-    setFile(null);
-    setErrorMessage("");
-
+    setIsCameraOpen(true); setFile(null); setErrorMessage("");
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(async (pos) => {
-        const lat = pos.coords.latitude,
-          lng = pos.coords.longitude;
+        const lat = pos.coords.latitude, lng = pos.coords.longitude;
         let addr = "";
         try {
-          const r = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-          );
+          const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
           const d = await r.json();
           addr = d.display_name.split(",").slice(0, 3).join(", ");
         } catch {}
-        setGeoData({
-          lat: lat.toFixed(6),
-          lng: lng.toFixed(6),
-          address: addr,
-          time: new Date().toLocaleString("en-IN", {
-            dateStyle: "full",
-            timeStyle: "medium",
-          }),
-        });
+        setGeoData({ lat: lat.toFixed(6), lng: lng.toFixed(6), address: addr, time: new Date().toLocaleString("en-IN", { dateStyle: "full", timeStyle: "medium" }) });
       });
     }
-
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-      });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
-    } catch {
-      setErrorMessage("Camera access denied. Please enable camera permissions.");
-      setIsCameraOpen(false);
-    }
+    } catch { setErrorMessage("Camera access denied."); setIsCameraOpen(false); }
   };
 
   const capturePhoto = () => {
-    const video = videoRef.current,
-      canvas = canvasRef.current;
+    const video = videoRef.current, canvas = canvasRef.current;
     if (!video || !canvas) return;
-
     const ctx = canvas.getContext("2d");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const pad = 20,
-      bh = 140,
-      bw = canvas.width - pad * 2,
-      bx = pad,
-      by = canvas.height - bh - pad;
+    const pad = 20, bh = 140, bw = canvas.width - pad * 2, bx = pad, by = canvas.height - bh - pad;
     ctx.fillStyle = "rgba(0,0,0,0.75)";
-    if (ctx.roundRect) {
-      ctx.roundRect(bx, by, bw, bh, 15);
-      ctx.fill();
-    } else ctx.fillRect(bx, by, bw, bh);
-
-    const tx = bx + 20,
-      ty = by + 35;
+    if (ctx.roundRect) { ctx.roundRect(bx, by, bw, bh, 15); ctx.fill(); } else ctx.fillRect(bx, by, bw, bh);
+    const tx = bx + 20, ty = by + 35;
     ctx.textAlign = "left";
-    ctx.fillStyle = "white";
-    ctx.font = "bold 24px Arial";
-    ctx.fillText(area, tx, ty);
-    ctx.font = "14px Arial";
-    ctx.fillText(geoData.address || "", tx, ty + 25);
-    ctx.font = "14px monospace";
-    ctx.fillStyle = "#cbd5e1";
-    ctx.fillText(`Lat:${geoData.lat} Lng:${geoData.lng}`, tx, ty + 50);
-    ctx.font = "14px Arial";
-    ctx.fillStyle = "#fbbf24";
-    ctx.fillText(geoData.time || "", tx, ty + 75);
-
-    canvas.toBlob(
-      (blob) => {
-        setFile(new File([blob], "geo_evidence.jpg", { type: "image/jpeg" }));
-        stopCamera();
-      },
-      "image/jpeg",
-      0.95
-    );
+    ctx.fillStyle = "white";      ctx.font = "bold 24px Arial"; ctx.fillText(area, tx, ty);
+    ctx.font = "14px Arial";      ctx.fillText(geoData.address || "", tx, ty + 25);
+    ctx.font = "14px monospace";  ctx.fillStyle = "#cbd5e1"; ctx.fillText(`Lat:${geoData.lat} Lng:${geoData.lng}`, tx, ty + 50);
+    ctx.font = "14px Arial";      ctx.fillStyle = "#fbbf24"; ctx.fillText(geoData.time || "", tx, ty + 75);
+    canvas.toBlob((blob) => { setFile(new File([blob], "geo_evidence.jpg", { type: "image/jpeg" })); stopCamera(); }, "image/jpeg", 0.95);
   };
 
-  const stopCamera = () => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    setIsCameraOpen(false);
-  };
+  const stopCamera = () => { streamRef.current?.getTracks().forEach((t) => t.stop()); setIsCameraOpen(false); };
 
-  // ── Audio ───────────────────────────────────────────────────────────────────
   const toggleRecord = async () => {
-    if (isRecording) {
-      mediaRecorderRef.current?.stop();
-      setIsRecording(false);
-      return;
-    }
-
+    if (isRecording) { mediaRecorderRef.current?.stop(); setIsRecording(false); return; }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const stream   = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/ogg";
+      const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
       recorder.ondataavailable = (e) => chunksRef.current.push(e.data);
-      recorder.onstop = () =>
-        setAudioBlob(new Blob(chunksRef.current, { type: "audio/wav" }));
-      recorder.start();
-      setIsRecording(true);
-      setErrorMessage("");
-    } catch {
-      setErrorMessage("Microphone access denied. Please enable mic permissions.");
-    }
+      recorder.onstop = () => { setAudioBlob(new Blob(chunksRef.current, { type: mimeType })); setAudioMimeType(mimeType); };
+      recorder.start(); setIsRecording(true); setErrorMessage("");
+    } catch { setErrorMessage("Microphone access denied."); }
   };
 
-  // ── Submit ──────────────────────────────────────────────────────────────────
+  // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    // Validation
-    if (!text && !file && !audioBlob) {
-      setErrorMessage("Please provide at least one input (text, image, or audio).");
-      return;
-    }
-
+    if (!hasText && !hasAudio && !hasImage) { setErrorMessage("Please provide at least one input — text, voice note, or image."); return; }
+    if (conflictError) { setErrorMessage(conflictError); return; }
     const token = localStorage.getItem("citizenToken");
-    if (!token) {
-      setErrorMessage("Session expired. Please sign in again.");
-      setTimeout(() => router.push("/citizen/login"), 2000);
-      return;
-    }
+    if (!token) { setErrorMessage("Session expired. Please sign in again."); setTimeout(() => router.push("/citizen/login"), 2000); return; }
 
-    // Start submission flow
     setSubmissionStage(SUBMISSION_STAGES.VALIDATING);
     setErrorMessage("");
-
-    // Simulate validation step
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
+    await new Promise((r) => setTimeout(r, 1000));
     setSubmissionStage(SUBMISSION_STAGES.UPLOADING);
 
     const fd = new FormData();
-    fd.append("area", area);
-    fd.append("textInput", text || "");
+    fd.append("area",        area);
+    fd.append("textInput",   text || "");
     fd.append("description", text || "");
     if (addressDetails) fd.append("addressDetails", addressDetails);
-    if (geoData.lat) fd.append("latitude", geoData.lat);
-    if (geoData.lng) fd.append("longitude", geoData.lng);
-    if (file) fd.append("image", file);
-    if (audioBlob) fd.append("audio", audioBlob, "voice.wav");
+    if (geoData.lat)    fd.append("latitude",  geoData.lat);
+    if (geoData.lng)    fd.append("longitude", geoData.lng);
+    if (file)           fd.append("image", file);
+    if (audioBlob) {
+      const audioFilename = audioMimeType.includes("webm") ? "voice.webm" : "voice.ogg";
+      fd.append("audio", audioBlob, audioFilename);
+    }
 
     try {
-      // Upload
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      await new Promise((r) => setTimeout(r, 800));
       setSubmissionStage(SUBMISSION_STAGES.ANALYZING);
-
-      // Simulate analysis step
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
+      await new Promise((r) => setTimeout(r, 1000));
       setSubmissionStage(SUBMISSION_STAGES.PROCESSING_AI);
 
-      // Make actual API call
+      // ── Dynamic timeout based on input mode ──────────────────────────────
+      // audio needs up to 3 Whisper attempts on CPU — give it 4.5 min minimum
+      const timeoutMs = MODE_TIMEOUT_MS[inputMode] ?? 60_000;
+
       const res = await fetch(`${API_BASE}/api/grievances/submit`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        method:      "POST",
+        headers:     { Authorization: `Bearer ${token}` },
         credentials: "include",
-        body: fd,
+        body:        fd,
+        signal:      AbortSignal.timeout(timeoutMs),
       });
 
-      const json = await res.json();
+      if (res.status === 403) {
+        const json = await res.json();
+        throw new Error(json.message || "Image location is outside Kakinada jurisdiction or contains no GPS data.");
+      }
 
+      const json = await res.json();
       if (json.success) {
         setSuccessData(json.data);
         setPrediction(json.prediction ?? null);
@@ -649,79 +646,56 @@ export default function SmartLodge() {
       }
     } catch (err) {
       setSubmissionStage(SUBMISSION_STAGES.ERROR);
-      setErrorMessage(err.message || "Network error. Please check your connection.");
+      // Give a helpful message for timeouts
+      if (err.name === "TimeoutError" || err.name === "AbortError") {
+        setErrorMessage(
+          inputMode === "audio" || inputMode === "audio+image"
+            ? "Request timed out — voice transcription took too long. Please try a shorter recording (under 10 seconds) or use text input instead."
+            : "Request timed out. Please try again."
+        );
+      } else {
+        setErrorMessage(err.message || "Network error. Please check your connection.");
+      }
     }
   };
 
   const handleReset = () => {
-    setSubmissionStage(SUBMISSION_STAGES.IDLE);
-    setSuccessData(null);
-    setPrediction(null);
-    setText("");
-    setFile(null);
-    setAudioBlob(null);
-    setAddressDetails("");
-    setAddrFetched(false);
-    setGeoData({ lat: null, lng: null, address: "", time: "" });
-    setErrorMessage("");
+    setSubmissionStage(SUBMISSION_STAGES.IDLE); setSuccessData(null); setPrediction(null);
+    setText(""); setFile(null); setAudioBlob(null); setAudioMimeType("audio/webm");
+    setAddressDetails(""); setAddrFetched(false);
+    setGeoData({ lat: null, lng: null, address: "", time: "" }); setErrorMessage("");
   };
 
-  // ── Guards ──────────────────────────────────────────────────────────────────
-  if (!authChecked) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
-
+  if (!authChecked) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
   if (!isAuthed) return <AuthGate />;
+  if (submissionStage === SUBMISSION_STAGES.SUCCESS) return <SuccessScreen successData={successData} prediction={prediction} onReset={handleReset} />;
 
-  if (submissionStage === SUBMISSION_STAGES.SUCCESS) {
-    return (
-      <SuccessScreen
-        successData={successData}
-        prediction={prediction}
-        onReset={handleReset}
-      />
-    );
-  }
+  const isSubmitting = [SUBMISSION_STAGES.VALIDATING, SUBMISSION_STAGES.UPLOADING, SUBMISSION_STAGES.ANALYZING, SUBMISSION_STAGES.PROCESSING_AI].includes(submissionStage);
+  const submitDisabled = isSubmitting || (!hasText && !hasAudio && !hasImage) || !!conflictError;
 
-  // ── Submission Modal / Overlay ──────────────────────────────────────────────
-  const isSubmitting =
-    submissionStage === SUBMISSION_STAGES.VALIDATING ||
-    submissionStage === SUBMISSION_STAGES.UPLOADING ||
-    submissionStage === SUBMISSION_STAGES.ANALYZING ||
-    submissionStage === SUBMISSION_STAGES.PROCESSING_AI;
-
-  // ── Form ────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
-      {/* Submission Overlay */}
+
+      {/* ── Submission Overlay ────────────────────────────────────────────── */}
       {isSubmitting && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-slate-900 mb-2">
-                Submitting Grievance
-              </h2>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Submitting Grievance</h2>
               <p className="text-sm text-slate-600">
-                Please wait while we process your complaint...
+                {inputMode === "audio+image" ? "Running Whisper + BLIP + BERT — please wait…" :
+                 inputMode === "audio"        ? "Whisper is transcribing your voice note…"      :
+                 inputMode === "image"        ? "Scanning image and classifying grievance…"     :
+                 inputMode === "text+image"   ? "Verifying evidence image and classifying…"     :
+                                               "Classifying your grievance — almost done…"}
               </p>
             </div>
-
-            <SubmissionFlowIndicator stage={submissionStage} />
-
-            <div className="mt-8 pt-6 border-t border-slate-200 text-center">
-              <p className="text-xs text-slate-500">
-                This typically takes 30-60 seconds
-              </p>
-            </div>
+            <SubmissionFlowIndicator stage={submissionStage} inputMode={inputMode} />
           </div>
         </div>
       )}
 
-      {/* Error Modal */}
+      {/* ── Error Modal ───────────────────────────────────────────────────── */}
       {submissionStage === SUBMISSION_STAGES.ERROR && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
@@ -730,16 +704,9 @@ export default function SmartLodge() {
                 <AlertCircle className="w-6 h-6 text-red-600" />
               </div>
             </div>
-            <h2 className="text-xl font-bold text-slate-900 text-center mb-2">
-              Submission Failed
-            </h2>
-            <p className="text-sm text-slate-600 text-center mb-6">
-              {errorMessage}
-            </p>
-            <button
-              onClick={() => setSubmissionStage(SUBMISSION_STAGES.IDLE)}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-all"
-            >
+            <h2 className="text-xl font-bold text-slate-900 text-center mb-2">Submission Failed</h2>
+            <p className="text-sm text-slate-600 text-center mb-6">{errorMessage}</p>
+            <button onClick={() => setSubmissionStage(SUBMISSION_STAGES.IDLE)} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-all">
               Try Again
             </button>
           </div>
@@ -749,362 +716,144 @@ export default function SmartLodge() {
       <div className="max-w-3xl mx-auto p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-8 pt-4">
-          <button
-            onClick={() => router.back()}
-            className="p-2 hover:bg-slate-200 rounded-full text-slate-700 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
+          <button onClick={() => router.back()} className="p-2 hover:bg-slate-200 rounded-full text-slate-700 transition-colors"><ArrowLeft className="w-5 h-5" /></button>
           <div className="text-center">
             <h1 className="text-2xl font-bold text-slate-900">Smart Lodge</h1>
             <p className="text-xs text-slate-500">Grievance Submission</p>
           </div>
-          <Link
-            href="/citizen/history"
-            className="p-2 hover:bg-slate-200 rounded-full text-slate-700 transition-colors"
-          >
-            <History className="w-5 h-5" />
-          </Link>
+          <Link href="/citizen/history" className="p-2 hover:bg-slate-200 rounded-full text-slate-700 transition-colors"><History className="w-5 h-5" /></Link>
         </div>
 
-        {/* Error Banner */}
         {errorMessage && submissionStage === SUBMISSION_STAGES.IDLE && (
-          <div className="mb-6">
-            <ErrorBanner
-              error={errorMessage}
-              onDismiss={() => setErrorMessage("")}
-            />
-          </div>
+          <div className="mb-6"><ErrorBanner error={errorMessage} onDismiss={() => setErrorMessage("")} /></div>
         )}
 
-        {/* Form Card */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-lg p-6 space-y-6">
-          {/* 1 — Citizen Details */}
+
+          {/* ── 1. Citizen Details ────────────────────────────────────────── */}
           <div>
             <SectionHead icon={User} label="Citizen Details" />
-
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  disabled
-                  className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 cursor-not-allowed"
-                />
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">Name</label>
+                <input type="text" value={name} disabled className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 cursor-not-allowed" />
               </div>
-
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
-                  Ward / Area *
-                </label>
-                <select
-                  value={area}
-                  onChange={(e) => setArea(e.target.value)}
-                  className="w-full font-bold text-slate-900 bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all appearance-none cursor-pointer"
-                >
-                  {LOCATIONS.map((l) => (
-                    <option key={l} value={l}>
-                      {l}
-                    </option>
-                  ))}
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">Ward / Area *</label>
+                <select value={area} onChange={(e) => setArea(e.target.value)} className="w-full font-bold text-slate-900 bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all appearance-none cursor-pointer">
+                  {LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
                 </select>
               </div>
-
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
-                  Specific Address *
-                </label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">Specific Address *</label>
                 <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={addressDetails}
-                    onChange={(e) => {
-                      setAddressDetails(e.target.value);
-                      setAddrFetched(false);
-                    }}
-                    className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all placeholder-slate-400"
-                    placeholder="e.g., Near Water Tank, Opp. School Gate…"
-                  />
-                  <button
-                    onClick={handleFetchAddress}
-                    disabled={fetchingAddr}
-                    className="px-4 py-2.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-xl font-bold text-sm transition-all flex items-center gap-2 border border-slate-200 hover:border-blue-300 disabled:opacity-50"
-                  >
-                    {fetchingAddr ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : addrFetched ? (
-                      <CheckCircle2 className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <Navigation className="w-4 h-4" />
-                    )}
-                    <span className="hidden sm:inline">
-                      {fetchingAddr ? "Fetching..." : addrFetched ? "Fetched ✓" : "My Location"}
-                    </span>
+                  <input type="text" value={addressDetails} onChange={(e) => { setAddressDetails(e.target.value); setAddrFetched(false); }} className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all placeholder-slate-400" placeholder="e.g., Near Water Tank, Opp. School Gate…" />
+                  <button onClick={handleFetchAddress} disabled={fetchingAddr} className="px-4 py-2.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-xl font-bold text-sm transition-all flex items-center gap-2 border border-slate-200 hover:border-blue-300 disabled:opacity-50">
+                    {fetchingAddr ? <Loader2 className="w-4 h-4 animate-spin" /> : addrFetched ? <CheckCircle2 className="w-4 h-4 text-green-600" /> : <Navigation className="w-4 h-4" />}
+                    <span className="hidden sm:inline">{fetchingAddr ? "Fetching…" : addrFetched ? "Fetched ✓" : "My Location"}</span>
                   </button>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* 2 — Description */}
+          {/* ── 2. Description ────────────────────────────────────────────── */}
           <div>
             <SectionHead icon={Type} label="Description of Issue" />
-
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              rows={4}
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all placeholder-slate-400 resize-none"
-              placeholder="Describe the civic issue clearly — what it is, how long it has been there, and who is affected…"
-            />
-            <FieldNote text="Be specific. Mention the type of problem, duration, and impact. This helps AI triage and speeds up resolution." />
+            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all placeholder-slate-400 resize-none" placeholder="Describe the civic issue clearly — what it is, how long it has been there, and who is affected…" />
+            <FieldNote text="Be specific. Mention the type of problem, duration, and impact." />
+            {hasText && !hasAudio && !hasImage && <TimingNote mode="text" />}
+            {hasText &&  hasImage && !hasAudio && <TimingNote mode="text+image" />}
           </div>
 
-          {/* 3 — Voice Note */}
-          <div
-            className={`rounded-3xl border-2 p-5 transition-all ${
-              isRecording
-                ? "border-red-200 bg-red-50/30"
-                : audioBlob
-                ? "border-green-200 bg-green-50/30"
-                : "border-slate-100 bg-white"
-            }`}
-          >
-            <SectionHead
-              icon={Mic}
-              label={
-                isRecording ? "Recording…" : audioBlob ? "Voice Note Saved" : "Voice Note"
-              }
-              extra={
-                audioBlob && (
-                  <button
-                    onClick={() => setAudioBlob(null)}
-                    className="text-slate-400 hover:text-red-500 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )
-              }
+          {/* ── 3. Voice Note ─────────────────────────────────────────────── */}
+          <div className={`rounded-3xl border-2 p-5 transition-all ${isRecording ? "border-red-200 bg-red-50/30" : audioBlob ? "border-green-200 bg-green-50/30" : "border-slate-100 bg-white"}`}>
+            <SectionHead icon={Mic} label={isRecording ? "Recording…" : audioBlob ? "Voice Note Saved" : "Voice Note"}
+              extra={audioBlob && (
+                <button onClick={() => { setAudioBlob(null); setAudioMimeType("audio/webm"); }} className="text-slate-400 hover:text-red-500 transition-colors">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             />
-
             {!audioBlob ? (
-              <button
-                onClick={toggleRecord}
-                className={`w-full py-3 rounded-2xl font-bold text-sm border-2 transition-all flex items-center justify-center gap-2 ${
-                  isRecording
-                    ? "bg-red-600 text-white border-red-600 shadow-lg shadow-red-200"
-                    : "bg-slate-50 text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
-                }`}
-              >
+              <button onClick={toggleRecord} className={`w-full py-3 rounded-2xl font-bold text-sm border-2 transition-all flex items-center justify-center gap-2 ${isRecording ? "bg-red-600 text-white border-red-600 shadow-lg shadow-red-200" : "bg-slate-50 text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"}`}>
                 <Mic className="w-4 h-4" />
                 {isRecording ? "Tap to Stop Recording" : "Tap to Start Recording"}
               </button>
             ) : (
               <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-2xl text-green-700 text-sm font-bold">
-                <Play className="w-4 h-4" />
-                Voice note captured and ready to submit.
+                <Play className="w-4 h-4" />Voice note captured and ready to submit.
               </div>
             )}
-            <FieldNote text="Speak in Telugu, Hindi, or English. Describe the problem in your own words — our AI processes all three languages." />
+            <FieldNote text="Speak in Telugu, Hindi, or English. Our AI processes all three languages." />
+            {audioBlob && !hasImage && <TimingNote mode="audio" />}
+            {audioBlob &&  hasImage && <TimingNote mode="audio+image" />}
           </div>
 
-          {/* 4 — Visual Evidence */}
-          <div
-            className={`rounded-3xl border-2 p-5 transition-all ${
-              file
-                ? "border-green-200 bg-green-50/30"
-                : isCameraOpen
-                ? "border-blue-300 bg-blue-50/30"
-                : "border-slate-100 bg-white"
-            }`}
-          >
-            <SectionHead
-              icon={Camera}
-              label={
-                file ? "Evidence Captured" : isCameraOpen ? "Camera Active" : "Visual Evidence"
-              }
-              extra={
-                (file || isCameraOpen) && (
-                  <button
-                    onClick={() => {
-                      setFile(null);
-                      stopCamera();
-                    }}
-                    className="text-slate-400 hover:text-red-500 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )
-              }
+          {/* ── 4. Visual Evidence ────────────────────────────────────────── */}
+          <div className={`rounded-3xl border-2 p-5 transition-all ${file ? "border-green-200 bg-green-50/30" : isCameraOpen ? "border-blue-300 bg-blue-50/30" : "border-slate-100 bg-white"}`}>
+            <SectionHead icon={Camera} label={file ? "Evidence Captured" : isCameraOpen ? "Camera Active" : "Visual Evidence"}
+              extra={(file || isCameraOpen) && (
+                <button onClick={() => { setFile(null); stopCamera(); }} className="text-slate-400 hover:text-red-500 transition-colors"><X className="w-4 h-4" /></button>
+              )}
             />
-
             {isCameraOpen ? (
               <div className="relative rounded-2xl overflow-hidden bg-black shadow-lg">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-80 object-cover"
-                />
+                <video ref={videoRef} autoPlay playsInline className="w-full h-80 object-cover" />
                 <canvas ref={canvasRef} className="hidden" />
                 <div className="absolute bottom-16 left-3 right-3 bg-black/60 px-4 py-3 rounded-xl text-white backdrop-blur-sm border border-white/10">
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="text-sm font-bold">{area}</p>
-                      <p className="text-[10px] text-slate-300 mt-0.5 leading-tight max-w-[200px]">
-                        {geoData.address}
-                      </p>
-                      {geoData.lat && (
-                        <p className="text-[10px] text-blue-300 font-mono mt-1">
-                          Lat: {geoData.lat} | Lng: {geoData.lng}
-                        </p>
-                      )}
+                      <p className="text-[10px] text-slate-300 mt-0.5 leading-tight max-w-[200px]">{geoData.address}</p>
+                      {geoData.lat && <p className="text-[10px] text-blue-300 font-mono mt-1">Lat: {geoData.lat} | Lng: {geoData.lng}</p>}
                     </div>
                     <div className="text-right">
-                      <p className="text-base font-bold text-amber-400">
-                        {new Date().toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                      <p className="text-[10px] text-slate-300">
-                        {new Date().toLocaleDateString()}
-                      </p>
+                      <p className="text-base font-bold text-amber-400">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+                      <p className="text-[10px] text-slate-300">{new Date().toLocaleDateString()}</p>
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={capturePhoto}
-                  className="absolute bottom-4 left-1/2 -translate-x-1/2 w-14 h-14 bg-white rounded-full border-4 border-slate-300 shadow-lg active:scale-95 transition-transform z-20"
-                />
+                <button onClick={capturePhoto} className="absolute bottom-4 left-1/2 -translate-x-1/2 w-14 h-14 bg-white rounded-full border-4 border-slate-300 shadow-lg active:scale-95 transition-transform z-20" />
               </div>
             ) : !file ? (
-              <button
-                onClick={startCamera}
-                className="w-full py-5 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-2xl font-bold text-sm flex flex-col items-center gap-2 border-2 border-slate-200 hover:border-blue-300 transition-all"
-              >
-                <Camera className="w-7 h-7" />
-                Open Geo-Camera
+              <button onClick={startCamera} className="w-full py-5 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-2xl font-bold text-sm flex flex-col items-center gap-2 border-2 border-slate-200 hover:border-blue-300 transition-all">
+                <Camera className="w-7 h-7" />Open Geo-Camera
               </button>
             ) : (
               <div className="relative">
-                <img
-                  src={URL.createObjectURL(file)}
-                  alt="Evidence"
-                  className="w-full h-64 object-cover rounded-2xl border border-slate-200 shadow-sm"
-                />
+                <img src={URL.createObjectURL(file)} alt="Evidence" className="w-full h-64 object-cover rounded-2xl border border-slate-200 shadow-sm" />
                 <div className="absolute top-2 left-2 bg-green-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" />
-                  Geo-Tagged
+                  <CheckCircle2 className="w-3 h-3" />Geo-Tagged
                 </div>
-                <button
-                  onClick={startCamera}
-                  className="absolute bottom-2 right-2 bg-white text-slate-700 text-xs font-bold px-3 py-1.5 rounded-xl shadow-sm flex items-center gap-1 hover:bg-slate-50 border border-slate-200 transition-colors"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  Retake
+                <button onClick={startCamera} className="absolute bottom-2 right-2 bg-white text-slate-700 text-xs font-bold px-3 py-1.5 rounded-xl shadow-sm flex items-center gap-1 hover:bg-slate-50 border border-slate-200 transition-colors">
+                  <RefreshCw className="w-3 h-3" /> Retake
                 </button>
               </div>
             )}
-            <FieldNote text="Geo-Camera embeds GPS coordinates and timestamp into the image automatically, making evidence tamper-evident and location-verified." />
+            <FieldNote text="Geo-Camera embeds GPS coordinates and timestamp into the image — makes evidence tamper-evident and location-verified." />
+            {file && !hasAudio && !hasText && <TimingNote mode="image" />}
           </div>
 
-          {/* 5 — Input Classification Rules Indicator */}
-          {(text || audioBlob || file) && (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-              <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">
-                Input Classification
-              </p>
-              <div className="space-y-2">
-                {/* Text + Image */}
-                {text && file && !audioBlob && (
-                  <>
-                    <div className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-lg border border-slate-100">
-                      <div className="w-2 h-2 rounded-full bg-blue-500" />
-                      <span className="text-sm text-slate-700">
-                        <span className="font-bold text-slate-900">Text</span>
-                        <span className="text-slate-500"> → Grievance Description</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-lg border border-slate-100">
-                      <div className="w-2 h-2 rounded-full bg-amber-500" />
-                      <span className="text-sm text-slate-700">
-                        <span className="font-bold text-slate-900">Image</span>
-                        <span className="text-slate-500"> → Supporting Evidence</span>
-                      </span>
-                    </div>
-                  </>
-                )}
+          {/* ── 5. Input Mode Indicator ───────────────────────────────────── */}
+          <InputModeIndicator hasText={hasText} hasAudio={hasAudio} hasImage={hasImage} />
 
-                {/* Audio + Image */}
-                {audioBlob && file && !text && (
-                  <>
-                    <div className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-lg border border-slate-100">
-                      <div className="w-2 h-2 rounded-full bg-blue-500" />
-                      <span className="text-sm text-slate-700">
-                        <span className="font-bold text-slate-900">Audio</span>
-                        <span className="text-slate-500"> → Grievance Description</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-lg border border-slate-100">
-                      <div className="w-2 h-2 rounded-full bg-amber-500" />
-                      <span className="text-sm text-slate-700">
-                        <span className="font-bold text-slate-900">Image</span>
-                        <span className="text-slate-500"> → Supporting Evidence</span>
-                      </span>
-                    </div>
-                  </>
-                )}
-
-                {/* Image Only */}
-                {file && !text && !audioBlob && (
-                  <div className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-lg border border-slate-100">
-                    <div className="w-2 h-2 rounded-full bg-blue-500" />
-                    <span className="text-sm text-slate-700">
-                      <span className="font-bold text-slate-900">Image</span>
-                      <span className="text-slate-500"> → Grievance Description</span>
-                    </span>
-                  </div>
-                )}
-
-                {/* Text Only */}
-                {text && !file && !audioBlob && (
-                  <div className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-lg border border-slate-100">
-                    <div className="w-2 h-2 rounded-full bg-blue-500" />
-                    <span className="text-sm text-slate-700">
-                      <span className="font-bold text-slate-900">Text</span>
-                      <span className="text-slate-500"> → Grievance Description</span>
-                    </span>
-                  </div>
-                )}
-
-                {/* Audio Only */}
-                {audioBlob && !text && !file && (
-                  <div className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-lg border border-slate-100">
-                    <div className="w-2 h-2 rounded-full bg-blue-500" />
-                    <span className="text-sm text-slate-700">
-                      <span className="font-bold text-slate-900">Audio</span>
-                      <span className="text-slate-500"> → Grievance Description</span>
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Submit Button */}
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="group relative w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-bold text-base flex items-center justify-center gap-3 shadow-xl hover:shadow-2xl hover:shadow-slate-900/20 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
-          >
+          {/* ── Submit Button ─────────────────────────────────────────────── */}
+          <button onClick={handleSubmit} disabled={submitDisabled} className="group relative w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-bold text-base flex items-center justify-center gap-3 shadow-xl hover:shadow-2xl hover:shadow-slate-900/20 transition-all hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 overflow-hidden">
             <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
             <Send className="w-5 h-5 relative z-10" />
-            <span className="relative z-10">Submit Grievance</span>
+            <span className="relative z-10">{conflictError ? "Resolve Input Conflict to Submit" : "Submit Grievance"}</span>
           </button>
+
+          {/* Timing reminder under submit button */}
+          {inputMode && MODE_TIMING[inputMode] && (
+            <div className="flex items-center justify-center gap-1.5">
+              <Clock className={`w-3.5 h-3.5 ${MODE_TIMING[inputMode].color}`} />
+              <p className={`text-xs font-semibold ${MODE_TIMING[inputMode].color}`}>
+                {MODE_TIMING[inputMode].badge} · {MODE_TIMING[inputMode].estimate}
+              </p>
+            </div>
+          )}
 
           <p className="text-center text-xs text-slate-400 font-medium">
             Reviewed within 24 hours · Helpline: 1800-599-4116

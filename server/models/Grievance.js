@@ -68,6 +68,10 @@ const GrievanceSchema = new mongoose.Schema({
   },
 
   // 📝 GRIEVANCE DETAILS
+  // Populated from:
+  //   • text input directly
+  //   • aiPrediction.text when input was image-only or audio-only
+  //     (Flask returns the extracted / transcribed text in the "text" field)
   description: {
     type: String,
     default: "Media Evidence Submitted",
@@ -84,6 +88,16 @@ const GrievanceSchema = new mongoose.Schema({
     type: String,
     enum: ['Pending', 'Resolved', 'Spam'],
     default: 'Pending'
+  },
+
+  // 📥 INPUT MODE
+  // Tracks how the grievance was submitted so admins / analytics know the source.
+  // Values mirror Flask's "input_mode" field:
+  //   "text" | "audio" | "image" | "text+image" | "audio+image"
+  inputMode: {
+    type: String,
+    enum: ['text', 'audio', 'image', 'text+image', 'audio+image'],
+    default: 'text'
   },
 
   // 🤖 AI CLASSIFICATION
@@ -106,7 +120,7 @@ const GrievanceSchema = new mongoose.Schema({
   },
 
   urgency: {
-    type: String, // e.g. "urgent", "non-urgent"
+    type: String,
     default: null
   },
 
@@ -118,7 +132,7 @@ const GrievanceSchema = new mongoose.Schema({
   },
 
   priorityScore: {
-    type: Number, // 0.0 - 1.0
+    type: Number,
     min: 0,
     max: 1,
     default: null
@@ -146,16 +160,30 @@ const GrievanceSchema = new mongoose.Schema({
     default: null
   },
 
-  // 📍 LOCATION (GeoJSON for production-ready geospatial queries)
+  // 📍 LOCATION
+  // GeoJSON Point — stored when coordinates are provided via req.body
+  // AND Flask confirms the evidence image location is "valid" (inside Kakinada),
+  // OR when no image is attached (text/audio only, coordinates trusted from client).
+  //
+  // locationStatus mirrors Flask's "location" field (only present for image evidence):
+  //   "valid"   — EXIF GPS confirmed inside Kakinada bounding box
+  //   "invalid" — EXIF GPS missing or outside Kakinada
+  //   null      — no evidence image was submitted (text / audio only modes)
   location: {
     type: {
       type: String,
       enum: ['Point'],
     },
     coordinates: {
-      type: [Number], // [longitude, latitude]
+      type: [Number],   // [longitude, latitude]
       default: undefined
     }
+  },
+
+  locationStatus: {
+    type: String,
+    enum: ['valid', 'invalid', null],
+    default: null
   },
 
   // 🛠️ ADMIN
@@ -170,21 +198,19 @@ const GrievanceSchema = new mongoose.Schema({
   }
 
 }, {
-  timestamps: true // Automatically adds createdAt & updatedAt
+  timestamps: true
 });
 
 
 // ===============================
-// 🔹 INDEXES (IMPORTANT 🚀)
+// 🔹 INDEXES
 // ===============================
-
-// Geo index for map-based queries
-GrievanceSchema.index({ location: "2dsphere" },{sparse: true });
-
-// Faster filtering
+GrievanceSchema.index({ location: "2dsphere" }, { sparse: true });
 GrievanceSchema.index({ status: 1 });
 GrievanceSchema.index({ priority: 1 });
 GrievanceSchema.index({ createdAt: -1 });
+GrievanceSchema.index({ locationStatus: 1 });   // filter verified-location grievances
+GrievanceSchema.index({ inputMode: 1 });         // analytics by submission channel
 
 
 // ===============================

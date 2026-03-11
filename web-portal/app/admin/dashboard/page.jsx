@@ -60,12 +60,47 @@ const STATUS = {
   Pending: { label: "Pending", color: "#d97706", bg: "rgba(217,119,6,0.08)" },
   Spam: { label: "Spam", color: "#e11d48", bg: "rgba(225,29,72,0.08)" },
 };
+// ─── RISK_COLORS — corrected, all 4 schema enum values covered ───────────────
 const RISK_COLORS = {
-  High: { fill: "#e11d48", stroke: "#9f1239", bg: "rgba(225,29,72,0.05)", border: "rgba(225,29,72,0.2)", label: "HIGH RISK", priority: 1 },
-  Medium: { fill: "#ea580c", stroke: "#9a3412", bg: "rgba(234,88,12,0.05)", border: "rgba(234,88,12,0.2)", label: "MEDIUM RISK", priority: 2 },
-  Low: { fill: "#16a34a", stroke: "#15803d", bg: "rgba(22,163,74,0.05)", border: "rgba(22,163,74,0.2)", label: "LOW RISK", priority: 3 },
+  Critical: {
+    fill:   "#7f1d1d",
+    glow:   "#ef4444",
+    bg:     "rgba(127,29,29,0.06)",
+    border: "rgba(127,29,29,0.22)",
+    label:  "CRITICAL",
+    order:  4,                        // used for sidebar sort
+  },
+  High: {
+    fill:   "#e11d48",
+    glow:   "#fb7185",
+    bg:     "rgba(225,29,72,0.06)",
+    border: "rgba(225,29,72,0.22)",
+    label:  "HIGH",
+    order:  3,
+  },
+  Medium: {
+    fill:   "#ea580c",
+    glow:   "#fb923c",
+    bg:     "rgba(234,88,12,0.06)",
+    border: "rgba(234,88,12,0.22)",
+    label:  "MEDIUM",
+    order:  2,
+  },
+  Low: {
+    fill:   "#16a34a",
+    glow:   "#4ade80",
+    bg:     "rgba(22,163,74,0.06)",
+    border: "rgba(22,163,74,0.22)",
+    label:  "LOW",
+    order:  1,
+  },
 };
 
+// Fallback for any unexpected value coming from DB
+const getRiskColor = (level) => RISK_COLORS[level] ?? RISK_COLORS.Medium;
+
+// ─── LEVEL_ORDER — all 4 schema enum values ───────────────────────────────────
+const LEVEL_ORDER = { Critical: 4, High: 3, Medium: 2, Low: 1 };
 // ─── GFAS Config ─────────────────────────────────────────────────────────────
 const FAIRNESS_DIMENSIONS = ["area", "category", "language"];
 const DIM_META = {
@@ -324,78 +359,155 @@ function VoicePlayer({ src }) {
 
 // ─── Hotspot Alert Card ───────────────────────────────────────────────────────
 function HotspotAlertCard({ hotspot }) {
-  const rc = RISK_COLORS[hotspot.level] || RISK_COLORS.Medium;
+  const rc = getRiskColor(hotspot.level);
+  const fmt = (n, d = 1) => n != null ? Number(n).toFixed(d) : "—";
+  const snap = hotspot.flaskSnapshot ?? {};
+  const isPulse = hotspot.level === "Critical" || hotspot.level === "High";
+
   return (
     <div style={{
-      background: rc.bg, border: `1px solid ${rc.border}`,
-      borderLeft: `3px solid ${rc.fill}`, borderRadius: 8, padding: "11px 13px",
-      display: "flex", alignItems: "flex-start", gap: 10
+      background: "#fff",
+      border: `1px solid ${rc.border}`,
+      borderLeft: `4px solid ${rc.fill}`,
+      borderRadius: 10,
+      padding: "11px 12px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+      boxShadow: `0 2px 12px ${rc.fill}18`,
+      transition: "box-shadow 0.2s",
     }}>
-      <div style={{
-        width: 32, height: 32, borderRadius: "50%", background: rc.fill,
-        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
-      }}>
-        <span style={{ fontSize: 14, color: "#fff" }}>⚡</span>
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: rc.fill, textTransform: "capitalize" }}>
-            {hotspot.area}
-          </span>
-          <span style={{
-            fontSize: 8, fontWeight: 700, color: rc.fill, background: "#fff",
-            border: `1px solid ${rc.border}`, padding: "2px 7px", borderRadius: 3,
-            letterSpacing: "0.08em", textTransform: "uppercase"
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {/* Animated pulse dot */}
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: "50%",
+            background: `linear-gradient(135deg, ${rc.fill} 0%, ${rc.glow} 100%)`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: `0 0 0 3px ${rc.bg}`,
           }}>
-            {rc.label}
-          </span>
+            <Siren size={14} color="#fff" />
+          </div>
+          {isPulse && (
+            <span style={{
+              position: "absolute", top: -2, right: -2,
+              width: 10, height: 10, borderRadius: "50%",
+              background: rc.fill, border: "2px solid #fff",
+              animation: "liveAlertPulse 1.5s ease-in-out infinite",
+            }} />
+          )}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 2 }}>
+            <span style={{
+              fontSize: 12, fontWeight: 800, color: "#0f172a",
+              textTransform: "capitalize", overflow: "hidden",
+              textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              {hotspot.area}
+            </span>
+            <span style={{
+              fontSize: 8, fontWeight: 800, color: rc.fill,
+              background: rc.bg, border: `1px solid ${rc.border}`,
+              padding: "2px 7px", borderRadius: 4,
+              letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0,
+            }}>
+              {rc.label}
+            </span>
+            {hotspot.isResolved && (
+              <span style={{
+                fontSize: 8, fontWeight: 700, color: "#16a34a",
+                background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.25)",
+                padding: "2px 6px", borderRadius: 4, flexShrink: 0,
+              }}>✓ RESOLVED</span>
+            )}
+          </div>
           {hotspot.category && (
             <span style={{
-              fontSize: 8, fontWeight: 600, color: "#64748b", background: "#f1f5f9",
-              border: "1px solid #e2e8f0", padding: "2px 7px", borderRadius: 3, textTransform: "capitalize"
+              fontSize: 10, color: "#64748b",
+              textTransform: "capitalize",
             }}>
               {hotspot.category}
             </span>
           )}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, marginBottom: 8 }}>
-          {[
-            { label: "Growth", value: `${(hotspot.growthPercent || 0).toFixed(1)}%` },
-            { label: "Risk", value: (hotspot.riskScore || 0).toFixed(1) },
-            { label: "Conf.", value: `${((hotspot.confidenceScore || 0) * 100).toFixed(0)}%` },
-          ].map(m => (
-            <div key={m.label} style={{
-              background: "#fff", border: `1px solid ${rc.border}`,
-              borderRadius: 5, padding: "5px 8px"
-            }}>
-              <div style={{
-                fontSize: 8, fontWeight: 700, color: "#64748b", textTransform: "uppercase",
-                letterSpacing: "0.07em", marginBottom: 2
-              }}>{m.label}</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: rc.fill }}>{m.value}</div>
+
+        {/* Risk score big badge */}
+        <div style={{
+          textAlign: "center", flexShrink: 0,
+          background: rc.bg, border: `1.5px solid ${rc.border}`,
+          borderRadius: 8, padding: "4px 8px",
+        }}>
+          <div style={{ fontSize: 16, fontWeight: 900, color: rc.fill, lineHeight: 1 }}>
+            {fmt(hotspot.riskScore, 0)}
+          </div>
+          <div style={{ fontSize: 7, color: "#94a3b8", fontWeight: 600 }}>/ 100</div>
+        </div>
+      </div>
+
+      {/* Metrics row */}
+      <div style={{ display: "flex", gap: 5 }}>
+        {[
+          { label: "Growth", value: `${hotspot.growthPercent != null && hotspot.growthPercent > 0 ? "+" : ""}${fmt(hotspot.growthPercent)}%` },
+          { label: "Confidence", value: hotspot.confidenceScore != null ? `${(hotspot.confidenceScore * 100).toFixed(0)}%` : "—" },
+          { label: "Horizon", value: hotspot.forecastHorizonDays != null ? `${hotspot.forecastHorizonDays}d` : "—" },
+        ].map(m => (
+          <div key={m.label} style={{
+            flex: 1, background: "#f8fafc", border: "1px solid #e2e8f0",
+            borderRadius: 6, padding: "4px 6px", textAlign: "center",
+          }}>
+            <div style={{ fontSize: 7, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 1 }}>
+              {m.label}
             </div>
-          ))}
+            <div style={{ fontSize: 11, fontWeight: 800, color: "#334155" }}>{m.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Flask snapshot */}
+      {(snap.recentAvg != null || snap.forecastAvg != null) && (
+        <div style={{
+          display: "flex", gap: 10, padding: "5px 8px",
+          background: `${rc.fill}08`, border: `1px solid ${rc.border}`,
+          borderRadius: 6, fontSize: 9, color: "#64748b",
+        }}>
+          {snap.recentAvg != null && <span>Recent: <b style={{ color: rc.fill }}>{fmt(snap.recentAvg)}</b></span>}
+          {snap.forecastAvg != null && <span>Forecast: <b style={{ color: rc.fill }}>{fmt(snap.forecastAvg)}</b></span>}
+          {hotspot.createdAt && (
+            <span style={{ marginLeft: "auto", color: "#94a3b8" }}>
+              {new Date(hotspot.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+            </span>
+          )}
         </div>
-        <div style={{ height: 3, background: "#e5e7eb", borderRadius: 2, overflow: "hidden" }}>
-          <div style={{
-            height: "100%", width: `${Math.min(100, hotspot.riskScore || 0)}%`,
-            background: rc.fill, borderRadius: 2, transition: "width 0.6s ease"
-          }} />
-        </div>
+      )}
+
+      {/* Progress bar */}
+      <div style={{ height: 4, background: "#e5e7eb", borderRadius: 2, overflow: "hidden" }}>
+        <div style={{
+          height: "100%",
+          width: `${Math.min(100, Math.max(0, hotspot.riskScore ?? 0))}%`,
+          background: `linear-gradient(90deg, ${rc.fill}, ${rc.glow})`,
+          borderRadius: 2, transition: "width 0.8s ease",
+        }} />
       </div>
     </div>
   );
 }
 
-// ─── Beautiful Alerts Map ─────────────────────────────────────────────────────
+
+// ─── AlertsMap — beautiful animated pins, cluster popup ─────────────────────
 function AlertsMap({ hotspots }) {
-  const mapRef = useRef(null);
+  const mapRef    = useRef(null);
   const leafletRef = useRef(null);
   const [status, setStatus] = useState("idle");
 
+  const activeHotspots = hotspots.filter(h => !h.isResolved);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!hotspots || hotspots.length === 0) { setStatus("idle"); return; }
+    if (!activeHotspots.length) { setStatus("idle"); return; }
     let cancelled = false;
     setStatus("loading");
 
@@ -413,164 +525,245 @@ function AlertsMap({ hotspots }) {
         });
       }
       if (cancelled || !mapRef.current) return;
-
       if (leafletRef.current) { leafletRef.current.remove(); leafletRef.current = null; }
 
-      const L = window.L;
+      const L   = window.L;
       const map = L.map(mapRef.current, {
         center: [16.9891, 82.2475], zoom: 12,
-        zoomControl: false,
-        scrollWheelZoom: false,
+        zoomControl: false, scrollWheelZoom: false,
       });
-
-      // Custom zoom control position
       L.control.zoom({ position: "bottomright" }).addTo(map);
-
-      mapRef.current.addEventListener("wheel", (e) => {
+      mapRef.current.addEventListener("wheel", e => {
         if (e.ctrlKey) { e.preventDefault(); map.scrollWheelZoom.enable(); }
         else map.scrollWheelZoom.disable();
       }, { passive: false });
-
       leafletRef.current = map;
 
-      // Light/neutral sleek tile layer
       L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
         maxZoom: 19,
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com/">CARTO</a>',
       }).addTo(map);
 
-      // ── Group alerts by area ─────────────────────────────────────────
+      // ── Group by area (same area can have multiple categories) ────────────
       const areaGroups = {};
-      hotspots.forEach(hs => {
-        const key = (hs.area || "Unknown").toLowerCase().trim();
+      activeHotspots.forEach(hs => {
+        const key = (hs.area ?? "unknown").toLowerCase().trim();
         if (!areaGroups[key]) areaGroups[key] = { area: hs.area, items: [] };
         areaGroups[key].items.push(hs);
       });
 
-      const LEVEL_ORDER = { High: 3, Medium: 2, Low: 1 };
-      Object.values(areaGroups).forEach(group => {
-        const { area, items } = group;
-        // Sort items highest risk first
-        items.sort((a, b) => (b.riskScore || 0) - (a.riskScore || 0));
-        // The "worst" item drives pin colour/size
-        const worst = items.reduce((w, h) => (LEVEL_ORDER[h.level] || 0) > (LEVEL_ORDER[w.level] || 0) ? h : w, items[0]);
-        const rc = RISK_COLORS[worst.level] || RISK_COLORS.Medium;
+      Object.values(areaGroups).forEach(({ area, items }) => {
+        // Sort by riskScore descending — schema Number field
+        items.sort((a, b) => (b.riskScore ?? 0) - (a.riskScore ?? 0));
+
+        // Worst = highest LEVEL_ORDER (Critical > High > Medium > Low)
+        // LEVEL_ORDER now has all 4 schema enum values
+        const worst = items.reduce(
+          (w, h) => (LEVEL_ORDER[h.level] ?? 0) > (LEVEL_ORDER[w.level] ?? 0) ? h : w,
+          items[0]
+        );
+
+        const rc     = getRiskColor(worst.level);
         const coords = getCoords(area);
-        const count = items.length;
+        const count  = items.length;
 
-        // Outer dashed ring
-        const maxRadius = ((worst.riskScore || 50) / 100) * 500 + 180;
+        // ── Zone radius scales with riskScore (0–100) — direct schema value ─
+        const riskPct  = Math.min(100, Math.max(0, worst.riskScore ?? 50));
+        const baseRadius = (riskPct / 100) * 600 + 150;  // 150m min → 750m max
+        const levelMult = { Critical: 2.0, High: 1.5, Medium: 1.1, Low: 0.8 }[worst.level] ?? 1.0;
+        const zoneRadius = baseRadius * levelMult;
+
+        // Outer halo ring
         L.circle(coords, {
-          radius: maxRadius * 1.9,
+          radius: zoneRadius * 2.0,
           color: rc.fill, fillColor: rc.fill,
-          fillOpacity: 0.025, weight: 1, dashArray: "6 9", opacity: 0.3,
+          fillOpacity: 0.03, weight: 1,
+          dashArray: "6 10", opacity: 0.25,
         }).addTo(map);
 
-        // Main zone fill
+        // Main risk zone
         L.circle(coords, {
-          radius: maxRadius,
+          radius: zoneRadius,
           color: rc.fill, fillColor: rc.fill,
-          fillOpacity: 0.10, weight: 1.5, opacity: 0.65,
+          fillOpacity: worst.level === "Critical" ? 0.14 : 0.08,
+          weight: worst.level === "Critical" ? 2 : 1.5,
+          opacity: 0.7,
         }).addTo(map);
 
-        // ── Teardrop pin with alert count badge ────────────────────────
-        const pinH = worst.level === "High" ? 44 : worst.level === "Medium" ? 38 : 32;
-        const pinW = Math.round(pinH * 0.75);
-        const badgeHtml = count > 1
-          ? `<div style="position:absolute;top:-5px;right:-7px;width:17px;height:17px;border-radius:50%;background:#1e293b;color:#fff;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid #fff;line-height:1;">${count}</div>`
+        // ── Pin — size and pulse driven by schema level + riskScore ──────────
+        const pinH = { Critical: 54, High: 46, Medium: 40, Low: 34 }[worst.level] ?? 40;
+        const pinW = Math.round(pinH * 0.72);
+
+        // Animated pulse only for Critical (schema enum value)
+        const pulseAnim = worst.level === "Critical"
+          ? `<animate attributeName="r" values="3;6;3" dur="1s" repeatCount="indefinite"/>`
           : "";
+
+        // Count badge — shown when area has multiple categories
+        const badgeHtml = count > 1
+          ? `<div style="position:absolute;top:-6px;right:-8px;min-width:17px;height:17px;
+               border-radius:9px;background:#0f172a;color:#fff;font-size:9px;font-weight:800;
+               display:flex;align-items:center;justify-content:center;border:2px solid #fff;
+               padding:0 3px;line-height:1;">${count}</div>`
+          : "";
+
         const pinIcon = L.divIcon({
           className: "",
-          html: `<div style="position:relative;display:inline-block;filter:drop-shadow(0 4px 10px ${rc.fill}55);">
+          html: `<div style="position:relative;display:inline-block;
+                   filter:drop-shadow(0 4px 12px ${rc.fill}66);">
             <svg viewBox="0 0 30 40" width="${pinW}" height="${pinH}" xmlns="http://www.w3.org/2000/svg">
               <path d="M15 1C8.373 1 3 6.373 3 13c0 8.627 12 26 12 26S27 21.627 27 13C27 6.373 21.627 1 15 1z"
-                fill="${rc.fill}" stroke="white" stroke-width="1.8"/>
-              <circle cx="15" cy="13" r="6" fill="white" opacity="0.95"/>
-              <circle cx="15" cy="13" r="3.5" fill="${rc.fill}"/>
+                fill="${rc.fill}" stroke="white" stroke-width="2"/>
+              <circle cx="15" cy="13" r="4" fill="white" opacity="0.9">
+                ${pulseAnim}
+              </circle>
             </svg>
             ${badgeHtml}
           </div>`,
-          iconSize: [pinW + 8, pinH + 5],
-          iconAnchor: [(pinW + 8) / 2, pinH + 5],
-          popupAnchor: [0, -(pinH + 5)],
+          iconSize:   [pinW + 10, pinH + 6],
+          iconAnchor: [(pinW + 10) / 2, pinH + 6],
+          popupAnchor: [0, -(pinH + 6)],
         });
+
         const marker = L.marker(coords, { icon: pinIcon }).addTo(map);
 
-        // ── Floating label card ────────────────────────────────────────
-        const areaName = area.replace(/\b\w/g, c => c.toUpperCase());
+        // ── Floating label — riskScore direct from DB ─────────────────────
+        const areaName  = (area ?? "").replace(/\b\w/g, c => c.toUpperCase());
+        const riskLabel = `${(worst.riskScore ?? 0).toFixed(1)}<span style="font-size:7px;color:#94a3b8;">/100</span>`;
+
         const labelIcon = L.divIcon({
           className: "",
           html: `<div style="
-            display:flex;flex-direction:column;gap:3px;
-            background:white;
-            border:1.5px solid ${rc.fill}44;
-            border-left:3px solid ${rc.fill};
-            border-radius:8px;
-            padding:5px 9px;
-            box-shadow:0 2px 12px rgba(0,0,0,0.10);
-            white-space:nowrap;
-            min-width:110px;
-            pointer-events:none;
-          ">
-            <div style="display:flex;align-items:center;gap:5px;">
-              <span style="font-size:11px;font-weight:700;color:#0f172a;letter-spacing:-0.01em;">${areaName}</span>
-              <span style="font-size:7px;font-weight:800;color:${rc.fill};background:${rc.fill}15;border:1px solid ${rc.fill}33;padding:1px 5px;border-radius:6px;text-transform:uppercase;">${worst.level}</span>
-              ${count > 1 ? `<span style="font-size:7px;font-weight:800;color:#64748b;background:#f1f5f9;border:1px solid #e2e8f0;padding:1px 5px;border-radius:6px;">${count} alerts</span>` : ""}
+              background:white;border:1.5px solid ${rc.fill}44;border-left:3px solid ${rc.fill};
+              border-radius:8px;padding:5px 9px;box-shadow:0 2px 14px rgba(0,0,0,0.10);
+              white-space:nowrap;min-width:110px;pointer-events:none;">
+            <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
+              <span style="font-size:11px;font-weight:700;color:#0f172a;">${areaName}</span>
+              <span style="font-size:7px;font-weight:800;color:${rc.fill};background:${rc.fill}15;
+                border:1px solid ${rc.fill}33;padding:1px 5px;border-radius:4px;text-transform:uppercase;">
+                ${worst.level}
+              </span>
+              ${count > 1
+                ? `<span style="font-size:7px;font-weight:700;color:#64748b;background:#f1f5f9;
+                     border:1px solid #e2e8f0;padding:1px 5px;border-radius:4px;">${count} alerts</span>`
+                : ""}
             </div>
             <div style="display:flex;align-items:center;gap:6px;">
-              <span style="font-size:10px;font-weight:800;color:${rc.fill};font-family:monospace;">${Math.round(worst.riskScore || 0)}<span style="font-size:7px;font-weight:600;color:#94a3b8;"> /100</span></span>
-              ${worst.category ? `<span style="font-size:9px;color:#64748b;text-transform:capitalize;">${worst.category}</span>` : ""}
+              <span style="font-size:11px;font-weight:800;color:${rc.fill};font-family:monospace;">${riskLabel}</span>
+              ${worst.category
+                ? `<span style="font-size:9px;color:#64748b;text-transform:capitalize;">· ${worst.category}</span>`
+                : ""}
             </div>
+            ${worst.forecastHorizonDays != null
+              ? `<div style="font-size:8px;color:#94a3b8;margin-top:2px;">
+                   Horizon: ${worst.forecastHorizonDays}d · Window: ${worst.sourceWindowDays ?? 45}d
+                 </div>`
+              : ""}
           </div>`,
-          iconSize: [1, 1],
-          iconAnchor: [-(pinW / 2 + 10), pinH + 5],
+          iconSize:   [1, 1],
+          iconAnchor: [-(pinW / 2 + 10), pinH + 6],
         });
         L.marker(coords, { icon: labelIcon, interactive: false }).addTo(map);
 
-        // ── Rich popup — lists ALL alerts for this area ─────────────────
-        const alertsHtml = items.map((hs, idx) => {
-          const arc = RISK_COLORS[hs.level] || RISK_COLORS.Medium;
+        // ── Rich popup — every schema field surfaced ───────────────────────
+        const alertRows = items.map((hs, idx) => {
+          const arc  = getRiskColor(hs.level);
+          const snap = hs.flaskSnapshot ?? {};
+
+          // growthPercent: Number -500 to 500
+          const growthStr = hs.growthPercent != null
+            ? `${hs.growthPercent > 0 ? "+" : ""}${Number(hs.growthPercent).toFixed(1)}%`
+            : "—";
+
+          // confidenceScore: Number 0-1 → show as %
+          const confStr = hs.confidenceScore != null
+            ? `${(hs.confidenceScore * 100).toFixed(0)}%`
+            : "—";
+
+          // flaskSnapshot.recentAvg / forecastAvg — from Mixed DB field
+          const snapRow = (snap.recentAvg != null || snap.forecastAvg != null)
+            ? `<div style="display:flex;gap:10px;margin-top:6px;padding-top:5px;
+                 border-top:1px solid #f1f5f9;font-size:9px;color:#64748b;">
+                 ${snap.recentAvg  != null ? `<span>Recent avg: <b style="color:${arc.fill}">${Number(snap.recentAvg).toFixed(1)}</b></span>` : ""}
+                 ${snap.forecastAvg != null ? `<span>Forecast avg: <b style="color:${arc.fill}">${Number(snap.forecastAvg).toFixed(1)}</b></span>` : ""}
+               </div>`
+            : "";
+
           return `
-            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:3px solid ${arc.fill};border-radius:7px;padding:8px 10px;${idx > 0 ? "margin-top:6px;" : ""}">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
-                <span style="font-size:9px;font-weight:800;color:${arc.fill};text-transform:uppercase;letter-spacing:.05em;">${hs.level} RISK</span>
-                ${hs.category ? `<span style="font-size:9px;color:#64748b;text-transform:capitalize;margin-left:auto;">· ${hs.category}</span>` : ""}
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:3px solid ${arc.fill};
+              border-radius:7px;padding:9px 11px;${idx > 0 ? "margin-top:7px;" : ""}">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                <span style="font-size:9px;font-weight:800;color:${arc.fill};text-transform:uppercase;
+                  letter-spacing:.05em;">${hs.level} RISK</span>
+                ${hs.category
+                  ? `<span style="font-size:9px;color:#64748b;text-transform:capitalize;margin-left:auto;">
+                       ${hs.category}</span>`
+                  : ""}
               </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;">
+              <!-- Core schema metrics -->
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:2px;">
                 <div style="text-align:center;">
-                  <div style="font-size:7px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:2px;">Risk</div>
-                  <div style="font-size:15px;font-weight:900;color:${arc.fill};line-height:1;">${(hs.riskScore || 0).toFixed(1)}</div>
+                  <div style="font-size:7px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:1px;">Risk Score</div>
+                  <div style="font-size:16px;font-weight:900;color:${arc.fill};line-height:1;">${hs.riskScore != null ? Number(hs.riskScore).toFixed(1) : "—"}</div>
+                  <div style="font-size:7px;color:#94a3b8;">/ 100</div>
                 </div>
                 <div style="text-align:center;">
-                  <div style="font-size:7px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:2px;">Growth</div>
-                  <div style="font-size:15px;font-weight:900;color:${arc.fill};line-height:1;">${(hs.growthPercent || 0).toFixed(1)}%</div>
+                  <div style="font-size:7px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:1px;">Growth</div>
+                  <div style="font-size:16px;font-weight:900;color:${arc.fill};line-height:1;">${growthStr}</div>
+                  <div style="font-size:7px;color:#94a3b8;">forecast</div>
                 </div>
                 <div style="text-align:center;">
-                  <div style="font-size:7px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:2px;">Conf.</div>
-                  <div style="font-size:15px;font-weight:900;color:${arc.fill};line-height:1;">${((hs.confidenceScore || 0) * 100).toFixed(0)}%</div>
+                  <div style="font-size:7px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:1px;">Confidence</div>
+                  <div style="font-size:16px;font-weight:900;color:${arc.fill};line-height:1;">${confStr}</div>
+                  <div style="font-size:7px;color:#94a3b8;">model</div>
                 </div>
+              </div>
+              <!-- flaskSnapshot analytics row -->
+              ${snapRow}
+              <!-- Forecast meta from schema -->
+              <div style="display:flex;gap:8px;margin-top:5px;font-size:8px;color:#94a3b8;">
+                ${hs.forecastHorizonDays != null ? `<span>Horizon: <b style="color:#475569">${hs.forecastHorizonDays}d</b></span>` : ""}
+                ${hs.sourceWindowDays   != null ? `<span>Window: <b style="color:#475569">${hs.sourceWindowDays}d</b></span>`   : ""}
+                ${hs.createdAt          ? `<span style="margin-left:auto">${new Date(hs.createdAt).toLocaleDateString("en-IN",{day:"2-digit",month:"short"})}</span>` : ""}
               </div>
             </div>`;
         }).join("");
 
         marker.bindPopup(`
-          <div style="font-family:'DM Sans',system-ui,sans-serif;min-width:220px;max-width:260px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #f1f5f9;">
-              <div style="width:34px;height:34px;border-radius:9px;background:${rc.fill}18;border:1.5px solid ${rc.fill}44;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="${rc.fill}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+          <div style="font-family:'DM Sans',system-ui,sans-serif;min-width:230px;max-width:270px;">
+            <!-- Popup header -->
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;
+              padding-bottom:8px;border-bottom:1px solid #f1f5f9;">
+              <div style="width:34px;height:34px;border-radius:9px;background:${rc.fill}18;
+                border:1.5px solid ${rc.fill}44;display:flex;align-items:center;
+                justify-content:center;flex-shrink:0;">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="${rc.fill}">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z
+                    m0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                </svg>
               </div>
               <div style="flex:1;min-width:0;">
-                <div style="font-size:13px;font-weight:800;color:#0f172a;text-transform:capitalize;line-height:1.2;">${areaName}</div>
-                <div style="display:flex;align-items:center;gap:4px;margin-top:3px;">
-                  <span style="font-size:8px;font-weight:700;color:${rc.fill};text-transform:uppercase;letter-spacing:.06em;">${rc.label}</span>
-                  ${count > 1 ? `<span style="font-size:8px;font-weight:700;color:#64748b;background:#f1f5f9;border:1px solid #e2e8f0;padding:0 5px;border-radius:5px;">${count} alerts</span>` : ""}
+                <div style="font-size:13px;font-weight:800;color:#0f172a;
+                  text-transform:capitalize;">${areaName}</div>
+                <div style="display:flex;align-items:center;gap:5px;margin-top:3px;">
+                  <span style="font-size:8px;font-weight:800;color:${rc.fill};
+                    text-transform:uppercase;letter-spacing:.06em;">${worst.level}</span>
+                  <span style="font-size:8px;color:#64748b;font-family:monospace;">
+                    Risk: ${(worst.riskScore ?? 0).toFixed(1)}/100
+                  </span>
+                  ${count > 1
+                    ? `<span style="font-size:8px;font-weight:700;color:#64748b;background:#f1f5f9;
+                         border:1px solid #e2e8f0;padding:0 5px;border-radius:5px;">
+                         ${count} alerts</span>`
+                    : ""}
                 </div>
               </div>
             </div>
-            <div style="max-height:260px;overflow-y:auto;padding-right:2px;">
-              ${alertsHtml}
+            <!-- Alert rows -->
+            <div style="max-height:280px;overflow-y:auto;padding-right:2px;">
+              ${alertRows}
             </div>
-          </div>`, { maxWidth: 280 });
+          </div>`, { maxWidth: 290 });
       });
 
       if (!cancelled) setStatus("done");
@@ -579,7 +772,9 @@ function AlertsMap({ hotspots }) {
     return () => { cancelled = true; };
   }, [hotspots]);
 
-  useEffect(() => () => { if (leafletRef.current) { leafletRef.current.remove(); leafletRef.current = null; } }, []);
+  useEffect(() => () => {
+    if (leafletRef.current) { leafletRef.current.remove(); leafletRef.current = null; }
+  }, []);
 
   const isLoading = status === "loading";
 
@@ -594,41 +789,40 @@ function AlertsMap({ hotspots }) {
           backdropFilter: "blur(8px)", boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
         }}>
           <Loader2 size={11} color="#3b82f6" style={{ animation: "spin 0.7s linear infinite" }} />
-          <span style={{ color: "#334155" }}>Loading map…</span>
+          Loading map…
         </div>
       )}
 
-      {/* Active zones badge */}
       {status === "done" && (
         <div style={{
           position: "absolute", top: 16, left: 16, zIndex: 10000,
           background: "rgba(255,255,255,0.9)", border: "1px solid rgba(226,232,240,0.8)",
           borderRadius: 10, padding: "8px 14px", fontSize: 11, color: "#334155", fontWeight: 600,
-          display: "flex", alignItems: "center", gap: 8, backdropFilter: "blur(8px)",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+          display: "flex", alignItems: "center", gap: 8,
+          backdropFilter: "blur(8px)", boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
         }}>
           <span style={{
             width: 8, height: 8, borderRadius: "50%", background: "#e11d48",
             boxShadow: "0 0 0 3px rgba(225,29,72,0.3)", display: "inline-block",
             animation: "blink 2s infinite"
           }} />
-          <span>{hotspots.length} active zone{hotspots.length !== 1 ? "s" : ""}</span>
+          {activeHotspots.length} active zone{activeHotspots.length !== 1 ? "s" : ""}
         </div>
       )}
 
-      {/* Ctrl+scroll hint */}
       {status === "done" && (
         <div style={{
           position: "absolute", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 10000,
-          background: "rgba(255,255,255,0.85)", borderRadius: 8, padding: "5px 12px", border: "1px solid rgba(226,232,240,0.8)",
+          background: "rgba(255,255,255,0.85)", borderRadius: 8, padding: "5px 12px",
+          border: "1px solid rgba(226,232,240,0.8)",
           fontSize: 9, color: "#64748b", fontWeight: 600, letterSpacing: "0.05em",
-          backdropFilter: "blur(4px)", pointerEvents: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.05)"
+          backdropFilter: "blur(4px)", pointerEvents: "none",
         }}>
           CTRL + SCROLL TO ZOOM
         </div>
       )}
 
-      {/* Legend - styled for light map */}
+      {/* Legend — all 4 schema enum values */}
       <div style={{
         position: "absolute", bottom: 32, left: 16, zIndex: 10000,
         background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.8)",
@@ -639,10 +833,12 @@ function AlertsMap({ hotspots }) {
           fontSize: 8, fontWeight: 800, color: "#64748b", textTransform: "uppercase",
           letterSpacing: "0.12em", marginBottom: 10
         }}>RISK LEVELS</div>
+        {/* All 4 schema enum values shown */}
         {[
-          ["High", "#e11d48", "HIGH RISK"],
-          ["Medium", "#ea580c", "MEDIUM RISK"],
-          ["Low", "#16a34a", "LOW RISK"],
+          ["Critical", RISK_COLORS.Critical.fill, "CRITICAL RISK"],
+          ["High",     RISK_COLORS.High.fill,     "HIGH RISK"],
+          ["Medium",   RISK_COLORS.Medium.fill,   "MEDIUM RISK"],
+          ["Low",      RISK_COLORS.Low.fill,       "LOW RISK"],
         ].map(([label, fill, rLabel]) => (
           <div key={label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
             <div style={{
@@ -657,24 +853,8 @@ function AlertsMap({ hotspots }) {
         ))}
         <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(226,232,240,0.8)" }}>
           <div style={{ fontSize: 8, color: "#94a3b8", lineHeight: 1.5 }}>
-            Zone radius ∝ risk score
+            Zone radius ∝ riskScore (0–100)
           </div>
-        </div>
-      </div>
-
-      {/* Map watermark */}
-      <div style={{
-        position: "absolute", bottom: 32, right: 70, zIndex: 10000,
-        display: "flex", alignItems: "center", gap: 6, pointerEvents: "none"
-      }}>
-        <div style={{
-          background: "rgba(255,255,255,0.85)", borderRadius: 8, padding: "5px 10px",
-          border: "1px solid rgba(226,232,240,0.8)", backdropFilter: "blur(8px)", boxShadow: "0 4px 12px rgba(0,0,0,0.05)"
-        }}>
-          <div style={{
-            fontSize: 8, color: "#64748b", fontWeight: 700,
-            letterSpacing: "0.1em", textTransform: "uppercase"
-          }}>KMC · CivicConnect</div>
         </div>
       </div>
 
@@ -1331,472 +1511,885 @@ function GFASSidebarWidget({ gfasData, gfasLoading, onRun }) {
     </div>
   );
 }
-
+const scoreMeta = (s) => {
+    if (s >= 80) return { label: "Equitable",  color: s.success, bg: s.successBg, bd: s.successBd, bar: "#22c55e" };
+    if (s >= 60) return { label: "Moderate",   color: s.warn,    bg: s.warnBg,    bd: s.warnBd,    bar: "#f59e0b" };
+    return            { label: "Inequitable", color: s.danger,  bg: s.dangerBg,  bd: s.dangerBd,  bar: "#ef4444" };
+  };
 // ─── GFAS Modal ───────────────────────────────────────────────────────────────
 function GFASModal({ data, loading, error, onClose, onRefresh }) {
   const [tab, setTab] = useState("overview");
 
-  const dimData = { area: data?.area ?? null, category: data?.category ?? null, language: data?.language ?? null };
+  const dimData      = { area: data?.area ?? null, category: data?.category ?? null, language: data?.language ?? null };
   const overallScore = data?.overallFairnessScore ?? data?.overall_fairness_score ?? 0;
-  const overallCfg = SCORE_CONFIG(overallScore);
-  const avgRate = data?.summary?.avgResolutionRate ?? data?.summary?.avg_resolution_rate ?? 0;
-  const totalRecs = data?.summary?.totalGrievances ?? 0;
-  const dispIdx = data?.summary?.disparityIndex ?? null;
-  const flagsRaised = data?.summary?.flagsRaised ?? (data?.alerts ?? []).filter(a => a.severity !== "ok").length;
-  const allAlerts = data?.alerts ?? [];
-  const criticals = allAlerts.filter(a => a.severity === "critical");
-  const generatedAt = data?.generatedAt ? new Date(data.generatedAt) : null;
+  const totalRecs    = data?.summary?.totalGrievances ?? 0;
+  const avgRate      = data?.summary?.avgResolutionRate ?? 0;
+  const dispIdx      = data?.summary?.disparityIndex ?? null;
+  const flagsRaised  = data?.summary?.flagsRaised ?? 0;
+  const allAlerts    = data?.alerts ?? [];
+  const criticals    = allAlerts.filter(a => a.severity === "critical");
+  const warnings     = allAlerts.filter(a => a.severity === "warning");
+  const generatedAt  = data?.generatedAt ? new Date(data.generatedAt) : null;
+  const DIMS         = ["area", "category", "language"];
 
   const TABS = [
-    { key: "overview", label: "Executive Summary" },
-    { key: "area", label: "Geographic", dim: "area" },
-    { key: "category", label: "Category", dim: "category" },
-    { key: "language", label: "Language", dim: "language" },
-    { key: "actions", label: "Recommendations" },
+    { key: "overview",  label: "Overview",   icon: "◈" },
+    { key: "area",      label: "Geographic", icon: "⬡", dim: "area" },
+    { key: "category",  label: "Category",   icon: "◉", dim: "category" },
+    { key: "language",  label: "Language",   icon: "◎", dim: "language" },
+    { key: "actions",   label: "Actions",    icon: "⚑" },
   ];
 
-  const SL = ({ children, mt }) => (
-    <div style={{
-      fontSize: 9, fontWeight: 800, color: "#475569", textTransform: "uppercase",
-      letterSpacing: "0.12em", marginBottom: 10, marginTop: mt ?? 0,
-      borderBottom: "1px solid #e5e7eb", paddingBottom: 6
-    }}>{children}</div>
-  );
+  // ── Light mode design tokens ──────────────────────────────────────────────
+  const T = {
+    canvas:   "#f8fafc",
+    surface:  "#ffffff",
+    card:     "#f1f5f9",
+    cardHov:  "#e8eef7",
+    border:   "#e2e8f0",
+    borderHi: "#cbd5e1",
 
-  return (
-    <div onClick={onClose} style={{
-      position: "fixed", inset: 0, zIndex: 160000,
-      background: "rgba(15,23,42,0.65)", backdropFilter: "blur(6px)",
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 16
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: "#fff", width: "100%", maxWidth: 820,
-        maxHeight: "95vh", display: "flex", flexDirection: "column",
-        borderRadius: 12, boxShadow: "0 40px 100px rgba(0,0,0,0.3)",
-        border: "1px solid #cbd5e1", overflow: "hidden"
+    ink:    "#0f172a",
+    ink2:   "#1e293b",
+    ink3:   "#475569",
+    ghost:  "#94a3b8",
+
+    success: "#059669", successBg: "#f0fdf8", successBd: "#a7f3d0",
+    warn:    "#d97706", warnBg:    "#fffbeb", warnBd:    "#fcd34d",
+    danger:  "#e11d48", dangerBg:  "#fff1f3", dangerBd:  "#fecdd3",
+    accent:  "#4f46e5", accentBg:  "#eef2ff", accentBd:  "#c7d2fe",
+    cyan:    "#0891b2", cyanBg:    "#ecfeff", cyanBd:    "#a5f3fc",
+  };
+
+  const DIM_CFG = {
+    area:     { label: "Geographic Fairness", short: "AREA",     icon: "⬡", color: "#4f46e5", glow: "rgba(79,70,229,0.2)",  bg: "#eef2ff", bd: "#c7d2fe" },
+    category: { label: "Category Fairness",   short: "CATEGORY", icon: "◉", color: "#0891b2", glow: "rgba(8,145,178,0.2)",  bg: "#ecfeff", bd: "#a5f3fc" },
+    language: { label: "Language Fairness",   short: "LANGUAGE", icon: "◎", color: "#7c3aed", glow: "rgba(124,58,237,0.2)", bg: "#f5f3ff", bd: "#ddd6fe" },
+  };
+
+  const scoreCfg = (s) => {
+    if (s >= 80) return { label: "EQUITABLE",  color: T.success, bg: T.successBg, bd: T.successBd, bar: T.success, band: "A" };
+    if (s >= 60) return { label: "MODERATE",   color: T.warn,    bg: T.warnBg,    bd: T.warnBd,    bar: T.warn,    band: "B" };
+    return             { label: "INEQUITABLE", color: T.danger,  bg: T.dangerBg,  bd: T.dangerBd,  bar: T.danger,  band: "C" };
+  };
+
+  // ── Score ring ────────────────────────────────────────────────────────────
+  const ScoreRing = ({ score, size = 88, label, sublabel }) => {
+    const cfg = scoreCfg(score);
+    const r   = (size / 2) - 8;
+    const c   = 2 * Math.PI * r;
+    const pct = Math.min(1, Math.max(0, score / 100));
+    const ticks = Array.from({ length: 20 }, (_, i) => {
+      const angle = (i / 20) * 2 * Math.PI - Math.PI / 2;
+      const inner = r - 4, outer = r - 1;
+      return {
+        x1: size/2 + inner * Math.cos(angle), y1: size/2 + inner * Math.sin(angle),
+        x2: size/2 + outer * Math.cos(angle), y2: size/2 + outer * Math.sin(angle),
+        active: i / 20 <= pct,
+      };
+    });
+    return (
+      <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+        <svg width={size} height={size}>
+          <circle cx={size/2} cy={size/2} r={r + 5} fill="none" stroke={cfg.color} strokeWidth={1} opacity={0.12} />
+          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#e2e8f0" strokeWidth={7} />
+          <circle cx={size/2} cy={size/2} r={r} fill="none"
+            stroke={cfg.color} strokeWidth={7}
+            strokeDasharray={`${pct * c} ${c}`} strokeLinecap="round"
+            transform={`rotate(-90 ${size/2} ${size/2})`}
+            style={{ filter: `drop-shadow(0 0 4px ${cfg.color}88)`, transition: "stroke-dasharray 1s cubic-bezier(.4,0,.2,1)" }} />
+          {ticks.map((t, i) => (
+            <line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
+              stroke={t.active ? cfg.color : "#e2e8f0"}
+              strokeWidth={1.2} opacity={t.active ? 0.8 : 0.5} />
+          ))}
+        </svg>
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <span style={{ fontSize: size * 0.28, fontWeight: 800, color: T.ink, lineHeight: 1, fontFamily: "'DM Mono',monospace" }}>
+            {Math.round(score)}
+          </span>
+          {label    && <span style={{ fontSize: size * 0.10, color: cfg.color,  fontWeight: 700, marginTop: 2, letterSpacing: "0.06em" }}>{label}</span>}
+          {sublabel && <span style={{ fontSize: size * 0.09, color: T.ghost,    marginTop: 1 }}>{sublabel}</span>}
+        </div>
+      </div>
+    );
+  };
+
+  // ── Spark bar ─────────────────────────────────────────────────────────────
+  const SparkBar = ({ value, max, color, height = 24, width = 56 }) => {
+    const pct  = max > 0 ? Math.min(1, value / max) * 100 : 0;
+    const bars = 8;
+    return (
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 1.5, height, width }}>
+        {Array.from({ length: bars }, (_, i) => {
+          const threshold = ((i + 1) / bars) * 100;
+          const active    = pct >= threshold - (100 / bars);
+          return (
+            <div key={i} style={{
+              flex: 1, height: `${30 + (i / bars) * 70}%`,
+              background: active ? color : "#e2e8f0",
+              borderRadius: 2, transition: `background 0.3s ${i * 0.04}s`,
+              boxShadow: active ? `0 0 4px ${color}44` : "none",
+            }} />
+          );
+        })}
+      </div>
+    );
+  };
+
+  // ── Horizontal metric bar ─────────────────────────────────────────────────
+  const MetricBar = ({ label, value, baseline, color }) => {
+    const pct  = Math.min(100, Math.max(0, value));
+    const base = Math.min(100, Math.max(0, baseline ?? 50));
+    const diff = pct - base;
+    const diffC = Math.abs(diff) <= 5 ? T.success : Math.abs(diff) <= 15 ? T.warn : T.danger;
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(90px,140px) 1fr 58px", alignItems: "center", gap: 10, padding: "7px 0" }}>
+        <span style={{ fontSize: 10, color: T.ink3, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textTransform: "capitalize" }}>
+          {label}
+        </span>
+        <div style={{ position: "relative", height: 16, background: "#f1f5f9", borderRadius: 3, border: `1px solid ${T.border}` }}>
+          <div style={{
+            position: "absolute", left: 0, top: 0, height: "100%",
+            width: `${pct}%`, minWidth: 2,
+            background: `linear-gradient(90deg, ${color}88, ${color})`,
+            borderRadius: 3, transition: "width 0.8s cubic-bezier(.4,0,.2,1)"
+          }} />
+          <div style={{
+            position: "absolute", left: `${base}%`, top: -3,
+            width: 1.5, height: "calc(100% + 6px)",
+            background: "#64748b", zIndex: 2
+          }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: diffC, fontFamily: "'DM Mono',monospace" }}>
+            {diff > 0 ? "+" : ""}{diff.toFixed(1)}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Radar triangle ────────────────────────────────────────────────────────
+  const RadarTriangle = ({ scores, size = 160 }) => {
+    const cx = size / 2, cy = size / 2 + 8;
+    const r  = size * 0.36;
+    const angles = [-90, 30, 150].map(a => a * Math.PI / 180);
+    const pts = angles.map((a, i) => ({
+      ax: cx + r * Math.cos(a), ay: cy + r * Math.sin(a),
+      vx: cx + (r * scores[i] / 100) * Math.cos(a),
+      vy: cy + (r * scores[i] / 100) * Math.sin(a),
+    }));
+    const innerPoly = pts.map(p => `${p.vx},${p.vy}`).join(" ");
+    const colors    = [DIM_CFG.area.color, DIM_CFG.category.color, DIM_CFG.language.color];
+    const labels    = ["AREA", "CATEGORY", "LANG"];
+    return (
+      <svg width={size} height={size} style={{ overflow: "visible" }}>
+        {[0.25, 0.5, 0.75, 1.0].map((scale, gi) => (
+          <polygon key={gi}
+            points={pts.map((_, i) => `${cx + (r * scale) * Math.cos(angles[i])},${cy + (r * scale) * Math.sin(angles[i])}`).join(" ")}
+            fill="none" stroke="#e2e8f0" strokeWidth={1} />
+        ))}
+        {pts.map((p, i) => (
+          <line key={i} x1={cx} y1={cy} x2={p.ax} y2={p.ay} stroke="#e2e8f0" strokeWidth={1} />
+        ))}
+        <polygon points={innerPoly}
+          fill="rgba(79,70,229,0.08)" stroke="rgba(79,70,229,0.5)" strokeWidth={1.5}
+          style={{ filter: "drop-shadow(0 0 6px rgba(79,70,229,0.2))" }} />
+        {pts.map((p, i) => (
+          <g key={i}>
+            <circle cx={p.vx} cy={p.vy} r={5} fill={colors[i]} style={{ filter: `drop-shadow(0 0 4px ${colors[i]})` }} />
+            <circle cx={p.vx} cy={p.vy} r={2.5} fill="#fff" />
+          </g>
+        ))}
+        {pts.map((p, i) => (
+          <text key={i}
+            x={p.ax + (p.ax - cx) * 0.18} y={p.ay + (p.ay - cy) * 0.18 + 4}
+            textAnchor="middle" fontSize={7} fontWeight={700}
+            fill={colors[i]} letterSpacing={0.8} fontFamily="'DM Mono',monospace">
+            {labels[i]}
+          </text>
+        ))}
+        <text x={cx} y={cy + 4} textAnchor="middle" fontSize={11} fontWeight={800} fill={T.ink} fontFamily="'DM Mono',monospace">
+          {Math.round((scores[0] + scores[1] + scores[2]) / 3)}
+        </text>
+        <text x={cx} y={cy + 15} textAnchor="middle" fontSize={6} fontWeight={600} fill={T.ghost} letterSpacing={1}>AVG</text>
+      </svg>
+    );
+  };
+
+  // ── Disparity gauge ───────────────────────────────────────────────────────
+  const DisparityGauge = ({ label, rawVal, displayVal }) => {
+    const val   = parseFloat(rawVal) || 0;
+    const isHigh = val > 0.20, isMod = val > 0.10;
+    const color  = isHigh ? T.danger : isMod ? T.warn : T.success;
+    const bg     = isHigh ? T.dangerBg : isMod ? T.warnBg : T.successBg;
+    const bd     = isHigh ? T.dangerBd : isMod ? T.warnBd : T.successBd;
+    const pct    = Math.min(100, val * 250);
+    return (
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderTop: `2px solid ${color}`, borderRadius: 7, padding: "11px 13px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <span style={{ fontSize: 8, fontWeight: 700, color: T.ghost, textTransform: "uppercase", letterSpacing: "0.1em" }}>{label}</span>
+          <span style={{ fontSize: 7, fontWeight: 800, color, background: bg, border: `1px solid ${bd}`, padding: "1px 6px", borderRadius: 3, letterSpacing: "0.08em" }}>
+            {isHigh ? "HIGH" : isMod ? "MOD" : "LOW"}
+          </span>
+        </div>
+        <div style={{ fontSize: 18, fontWeight: 800, color, fontFamily: "'DM Mono',monospace", marginBottom: 7, lineHeight: 1 }}>
+          {displayVal ?? (val > 0 ? `${(val * 100).toFixed(1)}%` : "—")}
+        </div>
+        <div style={{ height: 3, background: "#f1f5f9", borderRadius: 2 }}>
+          <div style={{
+            height: "100%", width: `${pct}%`,
+            background: `linear-gradient(90deg, ${color}66, ${color})`,
+            borderRadius: 2, transition: "width 0.8s"
+          }} />
+        </div>
+      </div>
+    );
+  };
+
+  // ── Breakdown row — TPR column removed ───────────────────────────────────
+  const BreakdownRow = ({ row, dim, i, color }) => {
+    const groupVal   = row[dim] ?? row.group ?? "—";
+    const isFlagged  = row.isFlagged;
+    const urgencyPct = (row.statisticalParity ?? 0) * 100;
+    const priority   = row.meanPriorityScore ?? 0;
+    return (
+      <div className="gfas-row" style={{
+        display: "grid", gridTemplateColumns: "1fr 110px 70px 70px 80px",
+        padding: "9px 14px", alignItems: "center",
+        background: isFlagged ? T.dangerBg : i % 2 === 0 ? T.surface : T.card,
+        borderBottom: `1px solid ${T.border}`,
+        borderLeft: isFlagged ? `2px solid ${T.danger}` : "2px solid transparent",
       }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          {isFlagged && (
+            <span style={{
+              fontSize: 7, fontWeight: 800, color: T.danger,
+              background: T.dangerBg, border: `1px solid ${T.dangerBd}`,
+              padding: "1px 5px", borderRadius: 3, letterSpacing: "0.08em", flexShrink: 0
+            }}>FLAG</span>
+          )}
+          <span style={{
+            fontSize: 11, fontWeight: isFlagged ? 700 : 400,
+            color: isFlagged ? T.danger : T.ink2,
+            textTransform: "capitalize", overflow: "hidden",
+            textOverflow: "ellipsis", whiteSpace: "nowrap"
+          }}>{groupVal}</span>
+        </div>
+        {/* Urgency spark + value */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <SparkBar value={urgencyPct} max={100} color={isFlagged ? T.danger : color} height={20} width={44} />
+          <span style={{ fontSize: 10, color: T.ink3, fontFamily: "'DM Mono',monospace", minWidth: 34 }}>
+            {urgencyPct.toFixed(1)}%
+          </span>
+        </div>
+        <span style={{ textAlign: "right", fontSize: 10, color: T.ink3, fontFamily: "'DM Mono',monospace" }}>
+          {priority.toFixed(2)}
+        </span>
+        <span style={{ textAlign: "right", fontSize: 10, color: T.ink3, fontFamily: "'DM Mono',monospace" }}>
+          {row.total ?? "—"}
+        </span>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <span style={{
+            fontSize: 8, fontWeight: 700,
+            color: isFlagged ? T.danger : T.success,
+            background: isFlagged ? T.dangerBg : T.successBg,
+            border: `1px solid ${isFlagged ? T.dangerBd : T.successBd}`,
+            padding: "2px 7px", borderRadius: 3, letterSpacing: "0.08em"
+          }}>{isFlagged ? "FLAGGED" : "OK"}</span>
+        </div>
+      </div>
+    );
+  };
 
-        {/* Header */}
-        <div style={{ background: PRIMARY.gradient, flexShrink: 0 }}>
-          <div style={{ height: 3, background: "linear-gradient(90deg,rgba(255,255,255,0.3) 0%,rgba(255,255,255,0.1) 50%,rgba(255,255,255,0.3) 100%)" }} />
-          <div style={{ padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{
-                width: 42, height: 42, borderRadius: "50%", background: "rgba(255,255,255,0.15)",
-                border: "2px solid rgba(255,255,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center"
-              }}>
-                <Scale size={18} color="#fff" />
-              </div>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", letterSpacing: "0.02em" }}>
-                  GRIEVANCE FAIRNESS AUDIT SYSTEM
-                </div>
-                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", letterSpacing: "0.15em", marginTop: 2 }}>
-                  GFAS · KAKINADA MUNICIPAL CORPORATION · CIVIC CONNECT PORTAL
-                </div>
-              </div>
+  // ── Dimension panel ───────────────────────────────────────────────────────
+  const DimensionPanel = ({ dim, dimData: dd }) => {
+    const d           = DIM_CFG[dim];
+    const breakdown   = dd?.breakdown ?? [];
+    const flags       = dd?.fairness_flags ?? [];
+    const disparity   = dd?.disparity_summary ?? {};
+    const score       = dd?.fairnessScore ?? 0;
+    const cfg         = scoreCfg(score);
+    const average     = dd?.average ?? 0;
+    const avgRes      = dd?.average_resolution ?? 0;
+    const groupsFound = dd?.groups_found ?? [];
+    const flagged     = dd?.flagged ?? [];
+
+    // TPR removed from disparity metrics
+    const dispMetrics = [
+      { label: "Urgency-Rate Gap",    rawVal: disparity.statistical_parity_gap,        displayVal: disparity.statistical_parity_gap_label },
+      { label: "Priority-Score Gap",  rawVal: disparity.mean_priority_score_gap != null ? disparity.mean_priority_score_gap / 10 : null, displayVal: disparity.mean_priority_score_gap_label },
+      { label: "Resolution-Rate Gap", rawVal: disparity.resolution_rate_gap,           displayVal: disparity.resolution_rate_gap_label },
+    ].filter(x => x.displayVal);
+
+    const SL = ({ children }) => (
+      <div style={{ fontSize: 8, fontWeight: 700, color: T.ghost, textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ flex: 1, height: 1, background: T.border }} />{children}<span style={{ flex: 1, height: 1, background: T.border }} />
+      </div>
+    );
+
+    return (
+      <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 18 }}>
+
+        {/* Header banner */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 18, padding: "18px 20px",
+          background: d.bg, border: `1px solid ${d.bd}`, borderRadius: 10,
+          boxShadow: `0 4px 20px ${d.glow}`
+        }}>
+          <ScoreRing score={score} size={90} label={cfg.band} sublabel="/ 100" />
+          <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <span style={{ fontSize: 18, color: d.color }}>{d.icon}</span>
+              <span style={{ fontSize: 9, fontWeight: 700, color: d.color, letterSpacing: "0.14em", textTransform: "uppercase" }}>{d.label}</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {generatedAt && (
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 8, color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Report Generated</div>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.85)", fontFamily: "monospace", marginTop: 1 }}>
-                    {generatedAt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                    {" "}{generatedAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                  </div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: T.ink, marginBottom: 8 }}>
+              {cfg.label} — {Math.round(score)}/100
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {[
+                { k: "Groups audited", v: groupsFound.length || breakdown.length },
+                { k: "Flagged",        v: flagged.length,    warn: flagged.length > 0 },
+                { k: "Avg urgency",    v: `${Number(average).toFixed(1)}%` },
+                { k: "Avg resolution", v: `${Number(avgRes).toFixed(1)}%` },
+                { k: "Metric flags",   v: flags.length,      warn: flags.length > 0 },
+              ].map(s => (
+                <div key={s.k} style={{
+                  padding: "4px 10px",
+                  background: s.warn && s.v > 0 ? T.dangerBg : T.surface,
+                  border: `1px solid ${s.warn && s.v > 0 ? T.dangerBd : T.border}`,
+                  borderRadius: 5, fontSize: 10
+                }}>
+                  <span style={{ color: T.ghost, fontWeight: 500 }}>{s.k}: </span>
+                  <span style={{ color: s.warn && s.v > 0 ? T.danger : T.ink, fontWeight: 700, fontFamily: "'DM Mono',monospace" }}>{s.v}</span>
                 </div>
-              )}
-              <div style={{ display: "flex", gap: 5 }}>
-                <button onClick={onRefresh} disabled={loading} title="Re-run audit"
-                  style={{
-                    width: 30, height: 30, borderRadius: 5, border: "1px solid rgba(255,255,255,0.25)",
-                    background: "rgba(255,255,255,0.1)", cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center"
-                  }}>
-                  <RefreshCw size={12} color="rgba(255,255,255,0.8)"
-                    style={{ animation: loading ? "spin 0.8s linear infinite" : "none" }} />
-                </button>
-                <button onClick={onClose}
-                  style={{
-                    width: 30, height: 30, borderRadius: 5, border: "1px solid rgba(255,255,255,0.25)",
-                    background: "rgba(255,255,255,0.1)", cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center"
-                  }}>
-                  <X size={13} color="rgba(255,255,255,0.8)" />
-                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Disparity gauges — TPR removed */}
+        {dispMetrics.length > 0 && (
+          <div>
+            <SL>DISPARITY METRICS</SL>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 8 }}>
+              {dispMetrics.map(m => <DisparityGauge key={m.label} label={m.label} rawVal={m.rawVal} displayVal={m.displayVal} />)}
+            </div>
+          </div>
+        )}
+
+        {/* Metric flags */}
+        {flags.length > 0 && (
+          <div>
+            <SL>METRIC FLAGS ({flags.length})</SL>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {flags.map((f, i) => (
+                <div key={i} style={{
+                  padding: "11px 14px", background: T.dangerBg,
+                  border: `1px solid ${T.dangerBd}`, borderLeft: `3px solid ${T.danger}`,
+                  borderRadius: "0 7px 7px 0"
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: T.danger, marginBottom: 3 }}>{f.label}</div>
+                  <div style={{ fontSize: 11, color: T.ink3, lineHeight: 1.6 }}>{f.interpretation}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Group breakdown — TPR column removed */}
+        {breakdown.length > 0 && (
+          <div>
+            <SL>GROUP BREAKDOWN ({breakdown.length})</SL>
+            <div style={{ border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+              <div style={{
+                display: "grid", gridTemplateColumns: "1fr 110px 70px 70px 80px",
+                background: T.card, padding: "8px 14px",
+                fontSize: 7, fontWeight: 700, color: T.ghost,
+                textTransform: "uppercase", letterSpacing: "0.1em",
+                borderBottom: `1px solid ${T.border}`
+              }}>
+                <span>Group</span>
+                <span>Urgency %</span>
+                <span style={{ textAlign: "right" }}>Priority</span>
+                <span style={{ textAlign: "right" }}>Records</span>
+                <span style={{ textAlign: "right" }}>Status</span>
+              </div>
+              {breakdown.map((row, i) => (
+                <BreakdownRow key={i} row={row} dim={dim} i={i} color={d.color} />
+              ))}
+            </div>
+
+            {/* Distribution bar chart */}
+            <div style={{ marginTop: 10, padding: "12px 14px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8 }}>
+              <div style={{ fontSize: 8, color: T.ghost, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>
+                URGENCY RATE DISTRIBUTION
+              </div>
+              {breakdown.map((row, i) => (
+                <MetricBar key={i}
+                  label={row[dim] ?? row.group ?? `Group ${i + 1}`}
+                  value={(row.statisticalParity ?? 0) * 100}
+                  baseline={average}
+                  color={row.isFlagged ? T.danger : d.color}
+                />
+              ))}
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 8, paddingTop: 8, borderTop: `1px solid ${T.border}`, fontSize: 8, color: T.ghost }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <div style={{ width: 14, height: 2, background: "#64748b", borderRadius: 1 }} /> avg baseline
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <div style={{ width: 14, height: 3, background: d.color, borderRadius: 1 }} /> urgency rate
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <div style={{ width: 14, height: 3, background: T.danger, borderRadius: 1 }} /> flagged group
+                </span>
               </div>
             </div>
           </div>
+        )}
+      </div>
+    );
+  };
 
+  // ═══════════════════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════════════════
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=DM+Mono:wght@400;500;600&display=swap');
+        .gfas-root * { box-sizing: border-box; }
+        .gfas-root { font-family: 'DM Sans', sans-serif; }
+        .gfas-mono { font-family: 'DM Mono', monospace !important; }
+        @keyframes gfas-spin  { to { transform: rotate(360deg); } }
+        @keyframes gfas-fade  { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes gfas-pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+        @keyframes gfas-scan  { from{transform:translateY(-100%)} to{transform:translateY(100%)} }
+        .gfas-tab-btn { transition: all 0.15s ease; }
+        .gfas-tab-btn:hover { color: #0f172a !important; background: #f8fafc !important; }
+        .gfas-dim-card { transition: all 0.18s ease; cursor: pointer; }
+        .gfas-dim-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.10) !important; border-color: #cbd5e1 !important; }
+        .gfas-row:hover { background: #f8fafc !important; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+      `}</style>
+
+      <div className="gfas-root" onClick={onClose} style={{
+        position: "fixed", inset: 0, zIndex: 160000,
+        background: "rgba(15,23,42,0.5)", backdropFilter: "blur(12px)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 20
+      }}>
+        <div onClick={e => e.stopPropagation()} style={{
+          background: T.canvas, width: "100%", maxWidth: 920, maxHeight: "95vh",
+          display: "flex", flexDirection: "column", borderRadius: 12,
+          border: `1px solid ${T.borderHi}`,
+          boxShadow: "0 40px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(255,255,255,0.8)",
+          overflow: "hidden", animation: "gfas-fade 0.22s cubic-bezier(.4,0,.2,1)"
+        }}>
+
+          {/* ═══ HEADER ═══ */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "14px 20px", flexShrink: 0,
+            background: T.surface, borderBottom: `1px solid ${T.border}`,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 9,
+                background: T.accentBg, border: `1px solid ${T.accentBd}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: `0 0 16px rgba(79,70,229,0.15)`
+              }}>
+                <Scale size={16} color={T.accent} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: T.ink }}>Fairness Audit Report</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
+                  <span style={{ fontSize: 8, color: T.ghost, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+                    GFAS · Kakinada Municipal Corporation
+                  </span>
+                  {data && !loading && (
+                    <span style={{
+                      fontSize: 7, fontWeight: 700, color: T.success,
+                      background: T.successBg, border: `1px solid ${T.successBd}`,
+                      padding: "1px 6px", borderRadius: 3, letterSpacing: "0.1em"
+                    }}>LIVE DATA</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {data && !loading && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 8, padding: "5px 11px",
+                  background: T.card, border: `1px solid ${T.border}`, borderRadius: 8
+                }}>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: scoreCfg(overallScore).color, boxShadow: `0 0 6px ${scoreCfg(overallScore).color}` }} />
+                  <span className="gfas-mono" style={{ fontSize: 11, fontWeight: 700, color: T.ink }}>{Math.round(overallScore)}</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: scoreCfg(overallScore).color, letterSpacing: "0.06em" }}>{scoreCfg(overallScore).label}</span>
+                </div>
+              )}
+              {generatedAt && (
+                <span className="gfas-mono" style={{ fontSize: 8, color: T.ghost }}>
+                  {generatedAt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                  {" "}{generatedAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              )}
+              <button onClick={onRefresh} disabled={loading} style={{
+                width: 28, height: 28, borderRadius: 6, border: `1px solid ${T.border}`,
+                background: T.card, cursor: loading ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                opacity: loading ? 0.5 : 1, padding: 0
+              }}>
+                <RefreshCw size={11} color={T.ghost} style={{ animation: loading ? "gfas-spin 0.8s linear infinite" : "none" }} />
+              </button>
+              <button onClick={onClose} style={{
+                width: 28, height: 28, borderRadius: 6, border: `1px solid ${T.border}`,
+                background: T.card, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", padding: 0
+              }}>
+                <X size={12} color={T.ghost} />
+              </button>
+            </div>
+          </div>
+
+          {/* ═══ TABS ═══ */}
           {(data || loading) && (
-            <div style={{ display: "flex", borderTop: "1px solid rgba(255,255,255,0.1)", overflowX: "auto" }}>
+            <div style={{
+              display: "flex", borderBottom: `1px solid ${T.border}`,
+              overflowX: "auto", flexShrink: 0, background: T.surface, padding: "0 4px"
+            }}>
               {TABS.map(t => {
-                const active = tab === t.key;
-                const dimM = t.dim ? DIM_META[t.dim] : null;
-                const dimScore = t.dim ? (dimData[t.dim]?.fairnessScore ?? 0) : null;
+                const active   = tab === t.key;
+                const dimScore = t.dim ? (dimData[t.dim]?.fairnessScore ?? null) : null;
+                const hasCrit  = t.key === "overview" && criticals.length > 0;
+                const d        = t.dim ? DIM_CFG[t.dim] : null;
                 return (
-                  <button key={t.key} onClick={() => setTab(t.key)} style={{
-                    display: "flex", alignItems: "center", gap: 5,
-                    padding: "11px 16px",
-                    background: active ? "rgba(255,255,255,0.15)" : "transparent",
-                    border: "none", borderBottom: `2px solid ${active ? "#fff" : "transparent"}`,
-                    color: active ? "#fff" : "rgba(255,255,255,0.5)",
-                    fontSize: 11, fontWeight: active ? 700 : 500,
-                    cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
-                    letterSpacing: "0.02em", transition: "all 0.15s",
+                  <button key={t.key} className="gfas-tab-btn" onClick={() => setTab(t.key)} style={{
+                    display: "flex", alignItems: "center", gap: 6, padding: "10px 16px",
+                    background: active ? "#f8fafc" : "transparent", border: "none",
+                    borderBottom: `2px solid ${active ? (d?.color ?? T.accent) : "transparent"}`,
+                    color: active ? T.ink : T.ghost,
+                    fontSize: 11, fontWeight: active ? 700 : 400,
+                    cursor: "pointer", whiteSpace: "nowrap", fontFamily: "'DM Sans',sans-serif",
                   }}>
-                    {dimM && <dimM.icon size={10} color={active ? "#fff" : "rgba(255,255,255,0.4)"} />}
+                    <span style={{ fontSize: 12, color: active ? (d?.color ?? T.accent) : T.ghost }}>{t.icon}</span>
                     {t.label}
                     {dimScore !== null && (
-                      <span style={{
-                        fontSize: 8, fontWeight: 800, fontFamily: "monospace",
-                        padding: "1px 5px", borderRadius: 3, marginLeft: 2,
-                        background: active ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.08)",
-                        color: active ? "#fff" : "rgba(255,255,255,0.5)"
+                      <span className="gfas-mono" style={{
+                        fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3,
+                        background: active ? d.bg : T.card,
+                        color: active ? d.color : T.ghost,
+                        border: `1px solid ${active ? d.bd : T.border}`
                       }}>{Math.round(dimScore)}</span>
                     )}
-                    {criticals.length > 0 && t.key === "overview" && (
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#fca5a5", flexShrink: 0 }} />
+                    {hasCrit && (
+                      <span style={{
+                        width: 5, height: 5, borderRadius: "50%", background: T.danger,
+                        boxShadow: `0 0 5px ${T.danger}`, animation: "gfas-pulse 1.5s infinite"
+                      }} />
                     )}
                   </button>
                 );
               })}
             </div>
           )}
-        </div>
 
-        <div style={{ flex: 1, overflowY: "auto", background: "#fff" }}>
-          {loading && (
-            <div style={{
-              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-              padding: "80px 0", gap: 20, background: "#f8fafc"
-            }}>
-              <div style={{ position: "relative", width: 64, height: 64 }}>
-                {FAIRNESS_DIMENSIONS.map((d, i) => (
-                  <div key={d} style={{
-                    position: "absolute", inset: i * 10,
-                    border: "2px solid transparent", borderTopColor: DIM_META[d].color,
-                    borderRadius: "50%", animation: `spin ${1.0 + i * 0.35}s linear infinite`
-                  }} />
-                ))}
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>Conducting Fairness Audit…</div>
-                <div style={{ fontSize: 11, color: "#64748b", marginTop: 5 }}>
-                  Analysing {FAIRNESS_DIMENSIONS.map(d => DIM_META[d].label).join(" · ")}
-                </div>
-              </div>
-            </div>
-          )}
+          {/* ═══ BODY ═══ */}
+          <div style={{ flex: 1, overflowY: "auto", background: T.canvas }}>
 
-          {!loading && error && (
-            <div style={{
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 16,
-              padding: "60px 24px", background: "rgba(225,29,72,0.04)"
-            }}>
-              <div style={{
-                width: 48, height: 48, borderRadius: "50%", background: "rgba(225,29,72,0.15)",
-                display: "flex", alignItems: "center", justifyContent: "center"
-              }}>
-                <AlertOctagon size={22} color="#e11d48" />
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: "#7f1d1d" }}>Audit Failed</div>
-                <div style={{ fontSize: 12, color: "#991b1b", marginTop: 6, maxWidth: 400, lineHeight: 1.6 }}>{error}</div>
-              </div>
-              <button onClick={onRefresh} style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "9px 20px", borderRadius: 5, border: "none",
-                background: PRIMARY.gradient, color: "#fff", fontSize: 12, fontWeight: 700,
-                cursor: "pointer", fontFamily: "inherit"
-              }}>
-                <RefreshCw size={12} /> Retry Audit
-              </button>
-            </div>
-          )}
-
-          {!loading && data && tab === "overview" && (
-            <div>
-              <div style={{
-                background: overallCfg.bg, borderBottom: `1px solid ${overallCfg.border}`,
-                padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap"
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                  <ScoreGauge score={overallScore} size={90} />
-                  <div>
-                    <div style={{
-                      fontSize: 11, fontWeight: 700, color: overallCfg.color,
-                      textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4
-                    }}>
-                      Overall System Verdict
-                    </div>
-                    <div style={{ fontSize: 20, fontWeight: 900, color: "#0f172a", lineHeight: 1.2, marginBottom: 6 }}>
-                      {overallScore >= 80 ? "System is operating equitably"
-                        : overallScore >= 60 ? "Moderate disparities require attention"
-                          : "Significant disparities — action required"}
-                    </div>
-                    <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.5 }}>
-                      Based on {totalRecs} grievance records across {FAIRNESS_DIMENSIONS.length} audit dimensions.
-                      {dispIdx != null && ` Maximum disparity index: ${Number(dispIdx).toFixed(3)}.`}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
-                  {[
-                    { k: "Records Audited", v: totalRecs },
-                    { k: "Avg Urgency Rate", v: `${Number(avgRate).toFixed(1)}%` },
-                    { k: "Flags Raised", v: flagsRaised },
-                    { k: "Critical Issues", v: criticals.length },
-                  ].map(m => (
-                    <div key={m.k} style={{
-                      background: "white", border: `1px solid ${overallCfg.border}`,
-                      borderRadius: 6, padding: "6px 12px", minWidth: 130,
-                      display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12
-                    }}>
-                      <span style={{ fontSize: 9, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em" }}>{m.k}</span>
-                      <span style={{ fontSize: 14, fontWeight: 900, color: "#0f172a", fontFamily: "monospace" }}>{m.v}</span>
-                    </div>
+            {/* Loading */}
+            {loading && (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0", gap: 20 }}>
+                <div style={{ position: "relative", width: 56, height: 56 }}>
+                  {DIMS.map((d, i) => (
+                    <div key={d} style={{
+                      position: "absolute", inset: i * 9,
+                      border: "1.5px solid transparent", borderTopColor: DIM_CFG[d].color,
+                      borderRadius: "50%", animation: `gfas-spin ${0.8 + i * 0.25}s linear infinite`
+                    }} />
                   ))}
                 </div>
-              </div>
-
-              <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 18 }}>
-                <div>
-                  <SL>Dimension-wise Fairness Scores</SL>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 10 }}>
-                    {FAIRNESS_DIMENSIONS.map(dim => {
-                      const dScore = dimData[dim]?.fairnessScore ?? 0;
-                      const dCfg = SCORE_CONFIG(dScore);
-                      const dMeta = DIM_META[dim];
-                      const DIcon = dMeta.icon;
-                      const dFlags = (dimData[dim]?.fairness_flags ?? []).length;
-                      const dFlagged = (dimData[dim]?.flagged ?? []).length;
-                      return (
-                        <div key={dim} onClick={() => setTab(dim)} style={{
-                          border: `1px solid ${dMeta.border}`,
-                          borderTop: `3px solid ${dMeta.color}`,
-                          borderRadius: 8, background: "#fff", cursor: "pointer", overflow: "hidden",
-                          transition: "box-shadow 0.15s"
-                        }}
-                          onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"}
-                          onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
-                          <div style={{ padding: "12px 14px" }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <div style={{
-                                  width: 26, height: 26, borderRadius: 6, background: dMeta.bg,
-                                  border: `1px solid ${dMeta.border}`, display: "flex", alignItems: "center", justifyContent: "center"
-                                }}>
-                                  <DIcon size={12} color={dMeta.color} />
-                                </div>
-                                <div>
-                                  <div style={{ fontSize: 10, fontWeight: 700, color: "#1e293b", textTransform: "uppercase", letterSpacing: "0.06em" }}>{dMeta.shortLabel}</div>
-                                  <div style={{ fontSize: 8, color: "#94a3b8" }}>{dMeta.label}</div>
-                                </div>
-                              </div>
-                              <span style={{
-                                fontSize: 7, fontWeight: 800, color: dCfg.color,
-                                background: dCfg.bg, border: `1px solid ${dCfg.border}`,
-                                padding: "2px 6px", borderRadius: 3, letterSpacing: "0.1em"
-                              }}>{dCfg.band}</span>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "flex-end", gap: 6, marginBottom: 8 }}>
-                              <span style={{ fontSize: 32, fontWeight: 900, color: "#0f172a", lineHeight: 1 }}>{Math.round(dScore)}</span>
-                              <span style={{ fontSize: 10, fontWeight: 700, color: dCfg.color, marginBottom: 4 }}>{dCfg.label}</span>
-                            </div>
-                            <div style={{ height: 5, background: "#f1f5f9", borderRadius: 3, overflow: "hidden", marginBottom: 8 }}>
-                              <div style={{ height: "100%", width: `${dScore}%`, background: dMeta.color, borderRadius: 3 }} />
-                            </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#94a3b8" }}>
-                              <span>{dFlags} flag{dFlags !== 1 ? "s" : ""}</span>
-                              <span style={{ color: dMeta.color, fontWeight: 700 }}>View →</span>
-                            </div>
-                          </div>
-                          {dFlagged > 0 && (
-                            <div style={{
-                              padding: "6px 14px", background: dMeta.bg, borderTop: `1px solid ${dMeta.border}`,
-                              display: "flex", alignItems: "center", gap: 5
-                            }}>
-                              <AlertTriangle size={8} color={dMeta.color} />
-                              <span style={{ fontSize: 9, fontWeight: 600, color: dMeta.color }}>
-                                {dFlagged} under-served group{dFlagged !== 1 ? "s" : ""}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: T.ink }}>Running Fairness Audit</div>
+                  <div style={{ fontSize: 10, color: T.ghost, marginTop: 4, letterSpacing: "0.08em" }}>AREA · CATEGORY · LANGUAGE</div>
                 </div>
+              </div>
+            )}
 
-                <div>
-                  <SL>Detected Disparities & Alerts</SL>
-                  {allAlerts.length === 0 ? (
+            {/* Error */}
+            {!loading && error && (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "60px 24px" }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: "50%",
+                  background: T.dangerBg, border: `1px solid ${T.dangerBd}`,
+                  display: "flex", alignItems: "center", justifyContent: "center"
+                }}>
+                  <AlertOctagon size={20} color={T.danger} />
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: T.ink, marginBottom: 6 }}>Audit Failed</div>
+                  <div style={{ fontSize: 12, color: T.ink3, maxWidth: 380, lineHeight: 1.7 }}>{error}</div>
+                </div>
+                <button onClick={onRefresh} style={{
+                  display: "flex", alignItems: "center", gap: 7, padding: "8px 20px",
+                  borderRadius: 7, border: `1px solid ${T.accentBd}`,
+                  background: T.accentBg, color: T.accent,
+                  fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans',sans-serif"
+                }}>
+                  <RefreshCw size={11} /> Retry Audit
+                </button>
+              </div>
+            )}
+
+            {/* ═══ OVERVIEW ═══ */}
+            {!loading && data && tab === "overview" && (() => {
+              const dimScores = DIMS.map(d => dimData[d]?.fairnessScore ?? 0);
+              const om = scoreCfg(overallScore);
+              return (
+                <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 20 }}>
+
+                  {/* Hero banner */}
+                  <div style={{
+                    display: "grid", gridTemplateColumns: "auto 1fr auto",
+                    alignItems: "center", gap: 24, padding: "22px 24px",
+                    background: T.surface, border: `1px solid ${T.border}`,
+                    borderRadius: 10, boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
+                    position: "relative", overflow: "hidden"
+                  }}>
                     <div style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      background: "rgba(22,163,74,0.05)", border: "1px solid rgba(22,163,74,0.2)",
-                      borderLeft: "4px solid #16a34a", borderRadius: "0 6px 6px 0", padding: "12px 14px"
-                    }}>
-                      <CheckCircle size={16} color="#15803d" />
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 800, color: "#14532d", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>SYSTEM EQUITABLE</div>
-                        <p style={{ fontSize: 12, color: "#166534", margin: 0, lineHeight: 1.5 }}>
-                          No significant disparities detected across all three audit dimensions.
-                        </p>
+                      position: "absolute", inset: 0, pointerEvents: "none",
+                      background: "linear-gradient(180deg, transparent 0%, rgba(79,70,229,0.02) 50%, transparent 100%)",
+                      animation: "gfas-scan 4s linear infinite"
+                    }} />
+                    <RadarTriangle scores={dimScores} size={148} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 8, fontWeight: 700, color: T.accent, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 8 }}>
+                        SYSTEM FAIRNESS VERDICT
+                      </div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: T.ink, lineHeight: 1.25, marginBottom: 10 }}>
+                        {overallScore >= 80
+                          ? "System operating equitably across all dimensions"
+                          : overallScore >= 60
+                          ? "Moderate disparities detected — periodic review advised"
+                          : "Significant disparities found — immediate action required"}
+                      </div>
+                      <div style={{ fontSize: 11, color: T.ink3, lineHeight: 1.7, marginBottom: 12 }}>
+                        Analysed <strong style={{ color: T.ink }}>{totalRecs.toLocaleString()}</strong> grievance records across <strong style={{ color: T.ink }}>3</strong> audit dimensions.
+                        {dispIdx != null && <> Max disparity index: <span className="gfas-mono" style={{ color: T.warn }}>{Number(dispIdx).toFixed(3)}</span>.</>}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {criticals.length > 0 && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: T.dangerBg, border: `1px solid ${T.dangerBd}`, borderRadius: 5 }}>
+                            <span style={{ width: 5, height: 5, borderRadius: "50%", background: T.danger, animation: "gfas-pulse 1.5s infinite" }} />
+                            <span style={{ fontSize: 10, fontWeight: 700, color: T.danger }}>{criticals.length} critical alert{criticals.length > 1 ? "s" : ""}</span>
+                          </div>
+                        )}
+                        {warnings.length > 0 && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: T.warnBg, border: `1px solid ${T.warnBd}`, borderRadius: 5 }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: T.warn }}>{warnings.length} warning{warnings.length > 1 ? "s" : ""}</span>
+                          </div>
+                        )}
+                        {criticals.length === 0 && warnings.length === 0 && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: T.successBg, border: `1px solid ${T.successBd}`, borderRadius: 5 }}>
+                            <CheckCircle size={9} color={T.success} />
+                            <span style={{ fontSize: 10, fontWeight: 700, color: T.success }}>No critical alerts</span>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {allAlerts.map((a, i) => {
-                        const isCrit = a.severity === "critical";
-                        const isWarn = a.severity === "warning";
-                        const dimM = a.dimension ? DIM_META[a.dimension] : null;
-                        const bgC = isCrit ? "rgba(225,29,72,0.05)" : isWarn ? "rgba(180,83,9,0.05)" : "rgba(22,163,74,0.05)";
-                        const bdC = isCrit ? "rgba(225,29,72,0.2)" : isWarn ? "rgba(180,83,9,0.2)" : "rgba(22,163,74,0.2)";
-                        const txC = isCrit ? "#991b1b" : isWarn ? "#78350f" : "#14532d";
-                        const AlIcon = isCrit || isWarn ? AlertTriangle : CheckCircle;
+                    {/* Stat grid */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, flexShrink: 0 }}>
+                      {[
+                        { l: "RECORDS",     v: totalRecs.toLocaleString(), accent: false },
+                        { l: "AVG URGENCY", v: `${Number(avgRate).toFixed(1)}%`, accent: false },
+                        { l: "FLAGS",       v: flagsRaised, accent: flagsRaised > 0, color: T.warn },
+                        { l: "CRITICAL",    v: criticals.length, accent: criticals.length > 0, color: T.danger },
+                      ].map(s => (
+                        <div key={s.l} style={{
+                          padding: "10px 12px", background: T.card,
+                          border: `1px solid ${s.accent ? (s.color + "50") : T.border}`,
+                          borderTop: `2px solid ${s.accent ? s.color : T.border}`,
+                          borderRadius: 7
+                        }}>
+                          <div style={{ fontSize: 7, fontWeight: 700, color: T.ghost, letterSpacing: "0.12em", marginBottom: 5 }}>{s.l}</div>
+                          <div className="gfas-mono" style={{ fontSize: 20, fontWeight: 800, color: s.accent ? s.color : T.ink }}>{s.v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Dimension cards */}
+                  <div>
+                    <div style={{ fontSize: 8, fontWeight: 700, color: T.ghost, textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ flex: 1, height: 1, background: T.border }} />DIMENSION SCORES<span style={{ flex: 1, height: 1, background: T.border }} />
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
+                      {DIMS.map(dim => {
+                        const d      = DIM_CFG[dim];
+                        const dd     = dimData[dim];
+                        const sc     = dd?.fairnessScore ?? 0;
+                        const cfg    = scoreCfg(sc);
+                        const flgLen = (dd?.flagged ?? []).length;
+                        const flgCnt = (dd?.fairness_flags ?? []).length;
                         return (
-                          <div key={i} style={{
-                            display: "flex", alignItems: "flex-start", gap: 10,
-                            background: bgC, border: `1px solid ${bdC}`,
-                            borderLeft: `4px solid ${isCrit ? "#e11d48" : isWarn ? "#b45309" : "#16a34a"}`,
-                            borderRadius: "0 6px 6px 0", padding: "10px 12px"
+                          <div key={dim} className="gfas-dim-card" onClick={() => setTab(dim)} style={{
+                            background: T.surface, border: `1px solid ${T.border}`,
+                            borderRadius: 9, overflow: "hidden",
+                            boxShadow: "0 2px 10px rgba(0,0,0,0.05)"
                           }}>
-                            <AlIcon size={13} color={txC} style={{ flexShrink: 0, marginTop: 1 }} />
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3, flexWrap: "wrap" }}>
-                                <span style={{ fontSize: 8, fontWeight: 800, color: txC, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                                  {isCrit ? "CRITICAL" : isWarn ? "WARNING" : "OK"}
-                                </span>
-                                {dimM && (
-                                  <span style={{
-                                    fontSize: 8, fontWeight: 700, color: dimM.color,
-                                    background: dimM.bg, border: `1px solid ${dimM.border}`,
-                                    padding: "1px 6px", borderRadius: 3, textTransform: "uppercase", letterSpacing: "0.08em"
-                                  }}>
-                                    {dimM.shortLabel}
-                                  </span>
-                                )}
+                            <div style={{ height: 2, background: d.color }} />
+                            <div style={{ padding: "14px 16px" }}>
+                              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14 }}>
+                                <div>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
+                                    <span style={{ fontSize: 14, color: d.color }}>{d.icon}</span>
+                                    <span style={{ fontSize: 8, fontWeight: 700, color: d.color, letterSpacing: "0.12em" }}>{d.short}</span>
+                                  </div>
+                                  <div style={{ fontSize: 10, color: T.ink3 }}>{d.label}</div>
+                                </div>
+                                <span style={{ fontSize: 7, fontWeight: 800, letterSpacing: "0.1em", padding: "3px 7px", borderRadius: 3, color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.bd}` }}>{cfg.label}</span>
                               </div>
-                              <p style={{ fontSize: 12, color: "#1e293b", lineHeight: 1.55, margin: 0, fontWeight: 500 }}>{a.message}</p>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                                <span className="gfas-mono" style={{ fontSize: 38, fontWeight: 800, color: T.ink, lineHeight: 1 }}>{Math.round(sc)}</span>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ height: 4, background: "#f1f5f9", borderRadius: 2, overflow: "hidden", marginBottom: 5 }}>
+                                    <div style={{ height: "100%", width: `${sc}%`, background: `linear-gradient(90deg, ${d.color}88, ${d.color})`, borderRadius: 2, transition: "width 0.8s" }} />
+                                  </div>
+                                  <div style={{ fontSize: 8, color: T.ghost }}>{flgCnt} flag{flgCnt !== 1 ? "s" : ""}</div>
+                                </div>
+                              </div>
+                              {flgLen > 0 ? (
+                                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 8px", background: T.dangerBg, border: `1px solid ${T.dangerBd}`, borderRadius: 5 }}>
+                                  <AlertTriangle size={8} color={T.danger} />
+                                  <span style={{ fontSize: 9, fontWeight: 600, color: T.danger }}>{flgLen} under-served group{flgLen > 1 ? "s" : ""}</span>
+                                </div>
+                              ) : (
+                                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 8px", background: T.successBg, border: `1px solid ${T.successBd}`, borderRadius: 5 }}>
+                                  <CheckCircle size={8} color={T.success} />
+                                  <span style={{ fontSize: 9, fontWeight: 600, color: T.success }}>No flagged groups</span>
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ padding: "6px 16px", background: d.bg, borderTop: `1px solid ${d.bd}`, fontSize: 8, color: d.color, fontWeight: 700, letterSpacing: "0.05em", display: "flex", justifyContent: "flex-end" }}>
+                              VIEW DETAILS →
                             </div>
                           </div>
                         );
                       })}
                     </div>
-                  )}
-                </div>
+                  </div>
 
-                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "14px 16px" }}>
-                  <SL>Fairness Score Scale Reference</SL>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 8 }}>
-                    {[
-                      ["A — EQUITABLE", "80–100", "#15803d", "rgba(22,163,74,0.06)", "rgba(22,163,74,0.2)", "No significant disparity. System appears equitable."],
-                      ["B — MODERATE", "60–79", "#b45309", "rgba(180,83,9,0.06)", "rgba(180,83,9,0.2)", "Some disparity. Monitor and review periodically."],
-                      ["C — INEQUITABLE", "0–59", "#b91c1c", "rgba(225,29,72,0.06)", "rgba(225,29,72,0.2)", "Significant disparity. Immediate action recommended."],
-                    ].map(([label, range, color, bg, border, desc]) => (
-                      <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: 7, padding: "10px 12px" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
-                          <span style={{ fontSize: 10, fontWeight: 800, color }}>{label}</span>
-                          <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 700, color: "#94a3b8" }}>{range}</span>
+                  {/* Alerts */}
+                  <div>
+                    <div style={{ fontSize: 8, fontWeight: 700, color: T.ghost, textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ flex: 1, height: 1, background: T.border }} />SYSTEM ALERTS ({allAlerts.length})<span style={{ flex: 1, height: 1, background: T.border }} />
+                    </div>
+                    {allAlerts.length === 0 ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", background: T.successBg, border: `1px solid ${T.successBd}`, borderLeft: `3px solid ${T.success}`, borderRadius: "0 7px 7px 0" }}>
+                        <CheckCircle size={14} color={T.success} />
+                        <div>
+                          <div style={{ fontSize: 10, fontWeight: 800, color: T.success, letterSpacing: "0.1em", marginBottom: 2 }}>NO DISPARITIES DETECTED</div>
+                          <p style={{ fontSize: 11, color: T.ink3, margin: 0 }}>All dimensions within equitable thresholds.</p>
                         </div>
-                        <p style={{ fontSize: 10, color: "#374151", margin: 0, lineHeight: 1.5 }}>{desc}</p>
                       </div>
-                    ))}
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        {allAlerts.map((a, i) => {
+                          const isCrit = a.severity === "critical";
+                          const isWarn = a.severity === "warning";
+                          const ac = isCrit
+                            ? { color: T.danger, bg: T.dangerBg, bd: T.dangerBd, bar: T.danger, label: "CRITICAL" }
+                            : isWarn
+                            ? { color: T.warn,   bg: T.warnBg,   bd: T.warnBd,   bar: T.warn,   label: "WARNING" }
+                            : { color: T.success, bg: T.successBg, bd: T.successBd, bar: T.success, label: "OK" };
+                          const dc = a.dimension ? DIM_CFG[a.dimension] : null;
+                          const AI = isCrit || isWarn ? AlertTriangle : CheckCircle;
+                          return (
+                            <div key={i} style={{ display: "flex", gap: 12, padding: "11px 14px", background: ac.bg, border: `1px solid ${ac.bd}`, borderLeft: `3px solid ${ac.bar}`, borderRadius: "0 7px 7px 0" }}>
+                              <AI size={12} color={ac.color} style={{ flexShrink: 0, marginTop: 2 }} />
+                              <div style={{ flex: 1 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                                  <span style={{ fontSize: 8, fontWeight: 800, color: ac.color, letterSpacing: "0.12em" }}>{ac.label}</span>
+                                  {dc && <span style={{ fontSize: 7, fontWeight: 700, padding: "1px 5px", borderRadius: 3, color: dc.color, background: dc.bg, border: `1px solid ${dc.bd}`, letterSpacing: "0.08em" }}>{dc.short}</span>}
+                                </div>
+                                <p style={{ fontSize: 12, color: T.ink3, lineHeight: 1.6, margin: 0 }}>{a.message}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Score reference */}
+                  <div>
+                    <div style={{ fontSize: 8, fontWeight: 700, color: T.ghost, textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ flex: 1, height: 1, background: T.border }} />SCORING REFERENCE<span style={{ flex: 1, height: 1, background: T.border }} />
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
+                      {[
+                        { band: "A — Equitable",   range: "80–100", color: T.success, bg: T.successBg, bd: T.successBd, desc: "No significant disparity detected." },
+                        { band: "B — Moderate",    range: "60–79",  color: T.warn,    bg: T.warnBg,    bd: T.warnBd,    desc: "Some disparity; review advised." },
+                        { band: "C — Inequitable", range: "0–59",   color: T.danger,  bg: T.dangerBg,  bd: T.dangerBd,  desc: "Significant disparity; act now." },
+                      ].map(b => (
+                        <div key={b.band} style={{ padding: "10px 12px", background: b.bg, border: `1px solid ${b.bd}`, borderLeft: `3px solid ${b.color}`, borderRadius: "0 7px 7px 0" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                            <span style={{ fontSize: 9, fontWeight: 800, color: b.color, letterSpacing: "0.06em" }}>{b.band}</span>
+                            <span className="gfas-mono" style={{ fontSize: 9, color: T.ghost }}>{b.range}</span>
+                          </div>
+                          <p style={{ fontSize: 10, color: T.ink3, margin: 0, lineHeight: 1.55 }}>{b.desc}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
+              );
+            })()}
 
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 6, justifyContent: "center",
-                  fontSize: 10, color: "#94a3b8", padding: "4px 0"
-                }}>
-                  <Info size={10} /> Select a dimension tab above for detailed group-level analysis
+            {/* ═══ DIMENSION TABS ═══ */}
+            {!loading && data && DIMS.includes(tab) && (
+              <DimensionPanel dim={tab} dimData={dimData[tab]} />
+            )}
+
+            {/* ═══ ACTIONS TAB ═══ */}
+            {!loading && data && tab === "actions" && (
+              <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: T.ink, marginBottom: 4 }}>Corrective Actions</div>
+                  <div style={{ fontSize: 11, color: T.ink3, lineHeight: 1.6 }}>Prioritised by severity. Auto-generated by the GFAS engine.</div>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {!loading && data && FAIRNESS_DIMENSIONS.includes(tab) && (
-            <GFASDimensionPanel dim={tab} dimData={dimData[tab]} />
-          )}
-
-          {!loading && data && tab === "actions" && (
-            <div>
-              <div style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", padding: "14px 20px" }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a", marginBottom: 2 }}>Recommended Corrective Actions</div>
-                <div style={{ fontSize: 11, color: "#64748b" }}>
-                  Prioritised by severity. Generated by the GFAS audit engine based on metric thresholds.
-                </div>
-              </div>
-              <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
                 {(data.recommendations ?? []).length === 0 ? (
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    background: "rgba(22,163,74,0.05)", border: "1px solid rgba(22,163,74,0.2)",
-                    borderLeft: "4px solid #16a34a", borderRadius: "0 6px 6px 0", padding: "14px 16px"
-                  }}>
-                    <CheckCircle size={16} color="#15803d" />
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: T.successBg, border: `1px solid ${T.successBd}`, borderLeft: `3px solid ${T.success}`, borderRadius: "0 7px 7px 0" }}>
+                    <CheckCircle size={15} color={T.success} />
                     <div>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: "#14532d", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>NO ACTIONS REQUIRED</div>
-                      <p style={{ fontSize: 12, color: "#166534", margin: 0, lineHeight: 1.5 }}>
-                        System is performing equitably. Continue regular monitoring.
-                      </p>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: T.success, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 2 }}>No Actions Required</div>
+                      <p style={{ fontSize: 11, color: T.ink3, margin: 0 }}>System performing equitably. Continue regular monitoring.</p>
                     </div>
                   </div>
                 ) : (
                   (data.recommendations ?? []).map((r, i) => {
-                    const dimM = r.dimension ? DIM_META[r.dimension] : null;
-                    const isHigh = r.priority === "high";
-                    const isMed = r.priority === "medium";
-                    const priColor = isHigh ? "#991b1b" : isMed ? "#78350f" : "#14532d";
-                    const priBg = isHigh ? "rgba(225,29,72,0.05)" : isMed ? "rgba(180,83,9,0.05)" : "rgba(22,163,74,0.05)";
-                    const priBorder = isHigh ? "rgba(225,29,72,0.2)" : isMed ? "rgba(180,83,9,0.2)" : "rgba(22,163,74,0.2)";
-                    const priBand = isHigh ? "HIGH" : isMed ? "MEDIUM" : "LOW";
+                    const rDim  = r.dimension ? DIM_CFG[r.dimension] : null;
+                    const isHi  = r.priority === "high";
+                    const color = isHi ? T.danger : T.warn;
+                    const bg    = isHi ? T.dangerBg : T.warnBg;
+                    const bd    = isHi ? T.dangerBd : T.warnBd;
                     return (
-                      <div key={i} style={{
-                        border: "1px solid #e2e8f0",
-                        borderLeft: `4px solid ${dimM?.color ?? PRIMARY.blue}`,
-                        borderRadius: "0 8px 8px 0", background: "#fff", overflow: "hidden"
-                      }}>
-                        <div style={{
-                          padding: "11px 14px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9",
-                          display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap"
-                        }}>
-                          <span style={{
-                            fontSize: 8, fontWeight: 800, padding: "3px 8px", borderRadius: 3,
-                            background: priBg, color: priColor, border: `1px solid ${priBorder}`, letterSpacing: "0.1em"
-                          }}>
-                            {priBand} PRIORITY
-                          </span>
-                          {dimM && (
-                            <span style={{
-                              fontSize: 8, fontWeight: 700, padding: "3px 8px", borderRadius: 3,
-                              background: dimM.bg, color: dimM.color, border: `1px solid ${dimM.border}`,
-                              textTransform: "uppercase", letterSpacing: "0.08em",
-                              display: "flex", alignItems: "center", gap: 4
-                            }}>
-                              <dimM.icon size={8} />{dimM.shortLabel}
-                            </span>
-                          )}
-                          <span style={{ fontSize: 9, color: "#94a3b8", fontFamily: "monospace", marginLeft: "auto" }}>
-                            Action {i + 1} of {(data.recommendations ?? []).length}
-                          </span>
+                      <div key={i} style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `3px solid ${rDim?.color ?? T.accent}`, borderRadius: "0 9px 9px 0", overflow: "hidden" }}>
+                        <div style={{ padding: "8px 14px", background: T.card, borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 7, fontWeight: 800, padding: "2px 7px", borderRadius: 3, background: bg, color, border: `1px solid ${bd}`, letterSpacing: "0.1em" }}>{isHi ? "HIGH" : "MEDIUM"} PRIORITY</span>
+                          {rDim && <span style={{ fontSize: 7, fontWeight: 700, padding: "2px 7px", borderRadius: 3, background: rDim.bg, color: rDim.color, border: `1px solid ${rDim.bd}`, textTransform: "uppercase", letterSpacing: "0.08em" }}>{rDim.short}</span>}
+                          <span className="gfas-mono" style={{ fontSize: 8, color: T.ghost, marginLeft: "auto" }}>{i + 1} / {(data.recommendations ?? []).length}</span>
                         </div>
-                        <div style={{ padding: "12px 14px" }}>
-                          <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a", marginBottom: 7, lineHeight: 1.3 }}>
-                            {r.title}
-                          </div>
-                          <p style={{ fontSize: 12, color: "#374151", lineHeight: 1.7, margin: 0 }}>{r.description}</p>
+                        <div style={{ padding: "14px 16px" }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: T.ink, marginBottom: 7, lineHeight: 1.35 }}>{r.title}</div>
+                          <p style={{ fontSize: 12, color: T.ink3, lineHeight: 1.7, margin: 0 }}>{r.description}</p>
                           {(r.affectedArea || r.affected) && (
-                            <div style={{
-                              display: "flex", alignItems: "center", gap: 5, marginTop: 10,
-                              padding: "5px 9px", background: "#f8fafc", border: "1px solid #e2e8f0",
-                              borderRadius: 5, width: "fit-content"
-                            }}>
-                              <MapPin size={9} color="#64748b" />
-                              <span style={{ fontSize: 10, color: "#475569", fontWeight: 600 }}>
-                                Affected: {r.affectedArea ?? r.affected}
-                              </span>
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 10, padding: "4px 9px", background: T.card, border: `1px solid ${T.border}`, borderRadius: 5 }}>
+                              <MapPin size={9} color={T.ghost} />
+                              <span style={{ fontSize: 10, color: T.ink3, fontWeight: 600 }}>{r.affectedArea ?? r.affected}</span>
                             </div>
                           )}
                         </div>
@@ -1804,59 +2397,55 @@ function GFASModal({ data, loading, error, onClose, onRefresh }) {
                     );
                   })
                 )}
-
-                <div style={{
-                  marginTop: 8, padding: "12px 14px", background: "#f8fafc",
-                  border: "1px solid #e2e8f0", borderRadius: 7
-                }}>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>DISCLAIMER</div>
-                  <p style={{ fontSize: 10, color: "#64748b", margin: 0, lineHeight: 1.6 }}>
-                    These recommendations are generated automatically by the GFAS audit engine based on statistical analysis. They are indicative and should be reviewed by competent authority before implementation. All disparity thresholds are defined at 20% gap (±0.20) in line with standard fairness audit practice.
+                <div style={{ padding: "12px 14px", background: T.card, border: `1px solid ${T.border}`, borderRadius: 7, marginTop: 4 }}>
+                  <div style={{ fontSize: 8, fontWeight: 700, color: T.ghost, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>DISCLAIMER</div>
+                  <p style={{ fontSize: 10, color: T.ink3, margin: 0, lineHeight: 1.7 }}>
+                    Recommendations are auto-generated from statistical analysis and indicative only. Review by competent authority required before implementation. Disparity threshold: ±0.20 (20% gap).
                   </p>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        <div style={{
-          padding: "10px 20px", background: "#f8fafc", borderTop: "1px solid #e2e8f0",
-          display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, flexWrap: "wrap", gap: 8
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 9, color: "#94a3b8", fontFamily: "monospace" }}>
-              GFAS v2.0 · {totalRecs} records · {FAIRNESS_DIMENSIONS.length} dimensions
-            </span>
-            {data?.meta?.skipped > 0 && (
-              <span style={{ fontSize: 9, color: "#b45309", fontWeight: 600 }}>
-                ⚠ {data.meta.skipped} records excluded
+          {/* ═══ FOOTER ═══ */}
+          <div style={{
+            padding: "10px 20px", background: T.surface, borderTop: `1px solid ${T.border}`,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            flexShrink: 0, flexWrap: "wrap", gap: 8
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span className="gfas-mono" style={{ fontSize: 8, color: T.ghost }}>
+                GFAS v2.0 · {totalRecs.toLocaleString()} records · 3 dimensions
               </span>
-            )}
+              {data?.meta?.skipped > 0 && (
+                <span style={{ fontSize: 8, color: T.warn, fontWeight: 600 }}>⚠ {data.meta.skipped} excluded</span>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 7 }}>
+              {data && (
+                <button onClick={onRefresh} disabled={loading} style={{
+                  display: "flex", alignItems: "center", gap: 5, padding: "6px 14px",
+                  borderRadius: 5, border: `1px solid ${T.border}`, background: T.card,
+                  color: T.ink3, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                  fontFamily: "'DM Sans',sans-serif", opacity: loading ? 0.4 : 1
+                }}>
+                  <RefreshCw size={10} style={{ animation: loading ? "gfas-spin 0.8s linear infinite" : "none" }} />
+                  Re-run
+                </button>
+              )}
+              <button onClick={onClose} style={{
+                padding: "6px 20px", borderRadius: 5, border: "none",
+                background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                color: "#fff", fontSize: 11, fontWeight: 700,
+                cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+                boxShadow: "0 4px 14px rgba(79,70,229,0.3)", letterSpacing: "0.04em"
+              }}>Close</button>
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 7 }}>
-            {data && (
-              <button onClick={onRefresh} disabled={loading} style={{
-                display: "flex", alignItems: "center",
-                gap: 5, padding: "6px 14px", borderRadius: 4, border: "1px solid #e2e8f0",
-                background: "#fff", color: "#374151", fontSize: 11, fontWeight: 600,
-                cursor: "pointer", fontFamily: "inherit", opacity: loading ? 0.5 : 1
-              }}>
-                <RefreshCw size={10} style={{ animation: loading ? "spin 0.8s linear infinite" : "none" }} />
-                Re-run Audit
-              </button>
-            )}
-            <button onClick={onClose} style={{
-              padding: "6px 18px", borderRadius: 4,
-              border: "none", background: PRIMARY.gradient, color: "#fff",
-              fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-              letterSpacing: "0.04em", boxShadow: "0 2px 8px rgba(37,99,235,0.3)"
-            }}>
-              CLOSE
-            </button>
-          </div>
+
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -2512,9 +3101,15 @@ export default function AdminDashboard() {
                     No active alerts
                   </div>
                 ) : (
-                  [...hotspots]
-                    .sort((a, b) => (RISK_COLORS[a.level]?.priority || 3) - (RISK_COLORS[b.level]?.priority || 3))
-                    .map(hs => <HotspotAlertCard key={hs._id || hs.area} hotspot={hs} />)
+                  // Inside the Live Alerts sidebar render — replaces the old sort
+       [...hotspots]
+  .filter(h => !h.isResolved)                          // only unresolved — schema field
+  .sort((a, b) =>
+    (getRiskColor(b.level).order ?? 0) -               // uses .order not .priority
+    (getRiskColor(a.level).order ?? 0) ||
+    (b.riskScore ?? 0) - (a.riskScore ?? 0)            // tiebreak by riskScore
+  )
+  .map(hs => <HotspotAlertCard key={hs._id} hotspot={hs} />)
                 )}
               </div>
               {hotspots.length > 0 && (

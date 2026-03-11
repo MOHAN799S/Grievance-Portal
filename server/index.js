@@ -8,7 +8,6 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const cookieParser = require("cookie-parser");
 const cloudinary = require("cloudinary").v2;
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const multer = require("multer");
 const sgMail = require("@sendgrid/mail");
 
@@ -26,9 +25,7 @@ const PORT = process.env.PORT || 5000;
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
 
 const COOKIE_OPTS = {
-  httpOnly: true,
-  secure: true,
-  sameSite: "none",
+  httpOnly: true, secure: true, sameSite: "none",
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 const REFRESH_COOKIE_OPTS = {
@@ -37,41 +34,35 @@ const REFRESH_COOKIE_OPTS = {
   path: "/api/auth/refresh",
 };
 
-// Flask validation sets (must match flask/app.py exactly)
 const FLASK_VALID_AREAS = new Set([
-  "suryaraopeta", "jagannaickpur", "raja rao peta", "bhanugudi", "old town",
-  "rajah street", "main road", "gandhi nagar", "ashok nagar", "nethaji nagar",
-  "srinivasa nagar", "tngo colony", "shankar vilas", "collector's colony",
-  "new town", "bank colony", "drivers colony", "fci colony", "burma colony",
-  "dwaraka nagar", "ayodhya nagar", "kakinada port area", "kakinada industrial area",
-  "fishing harbour", "dairy farm", "auto nagar", "kaleswara rao nagar",
-  "ramanayyapeta", "rama rao peta", "kondayya palem", "ganganapalle",
-  "gudari gunta", "indrapalem", "sarpavaram", "uppada", "kaikavolu",
-  "kothuru", "thammavaram", "thimmapuram", "vivekananda street", "jr ntr road",
-  "jntu kakinada area", "govt general hospital area", "apsp camp",
-  "kakinada beach road", "kakinada bazar", "anjaneya nagar",
+  "suryaraopeta","jagannaickpur","raja rao peta","bhanugudi","old town",
+  "rajah street","main road","gandhi nagar","ashok nagar","nethaji nagar",
+  "srinivasa nagar","tngo colony","shankar vilas","collector's colony",
+  "new town","bank colony","drivers colony","fci colony","burma colony",
+  "dwaraka nagar","ayodhya nagar","kakinada port area","kakinada industrial area",
+  "fishing harbour","dairy farm","auto nagar","kaleswara rao nagar",
+  "ramanayyapeta","rama rao peta","kondayya palem","ganganapalle",
+  "gudari gunta","indrapalem","sarpavaram","uppada","kaikavolu",
+  "kothuru","thammavaram","thimmapuram","vivekananda street","jr ntr road",
+  "jntu kakinada area","govt general hospital area","apsp camp",
+  "kakinada beach road","kakinada bazar","anjaneya nagar",
 ]);
 const FLASK_VALID_CATEGORIES = new Set([
-  "electricity", "garbage", "pollution", "public transport",
-  "roads", "sanitation", "stray animals", "water", "other",
+  "electricity","garbage","pollution","public transport",
+  "roads","sanitation","stray animals","water","other",
 ]);
 const CATEGORY_MAP = {
-  "electricity": "electricity", "garbage": "garbage", "pollution": "pollution",
-  "public transport": "public transport", "roads": "roads", "road": "roads",
-  "sanitation": "sanitation", "stray animals": "stray animals",
-  "stray animal": "stray animals", "water": "water",
+  "electricity":"electricity","garbage":"garbage","pollution":"pollution",
+  "public transport":"public transport","roads":"roads","road":"roads",
+  "sanitation":"sanitation","stray animals":"stray animals",
+  "stray animal":"stray animals","water":"water",
 };
-const FLASK_VALID_LANGUAGES = new Set(["english", "hindi", "telugu"]);
-const FLASK_VALID_URGENCY = new Set(["low", "medium", "high", "critical"]);
-const FAIRNESS_DIMENSIONS = ["area", "category", "language"];
-
+const FLASK_VALID_LANGUAGES  = new Set(["english","hindi","telugu"]);
+const FLASK_VALID_URGENCY    = new Set(["low","medium","high","critical"]);
+const FAIRNESS_DIMENSIONS    = ["area","category","language"];
 const PRIORITY_MAP = {
-  critical: "Critical",
-  medium: "Medium",
-  high: "High",
-  urgent: "High",
-  low: "Low",
-  "non-urgent": "Low",
+  critical:"Critical", medium:"Medium", high:"High",
+  urgent:"High", low:"Low", "non-urgent":"Low",
 };
 
 // =============================
@@ -79,27 +70,23 @@ const PRIORITY_MAP = {
 // =============================
 const app = express();
 
-// ── Cloudinary ──────────────────────────────────────────────────────────────
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
+  api_key:    process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// ── SendGrid ────────────────────────────────────────────────────────────────
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-// ── Models ──────────────────────────────────────────────────────────────────
 const HotspotAlert = require("./models/HotspotAlert");
-const Grievance = require("./models/Grievance");
-const User = require("./models/User");
-const Otp = require("./models/Otp");
+const Grievance    = require("./models/Grievance");
+const User         = require("./models/User");
+const Otp          = require("./models/Otp");
 
-// ── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors({
   origin: CLIENT_URL,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization"],
   credentials: true,
 }));
 app.use(express.json({ limit: "10mb" }));
@@ -114,27 +101,65 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-// ── Multer / Cloudinary Storage ──────────────────────────────────────────────
+// ── Multer — memoryStorage ────────────────────────────────────────────────────
+// FIX: Use memoryStorage so files stay as buffers in RAM.
+//
+// WHY NOT CloudinaryStorage here:
+//   CloudinaryStorage uploads to Cloudinary immediately during multer parsing,
+//   before our route handler runs. This means:
+//     1. req.files[x].path is a Cloudinary HTTPS URL, not a local path
+//     2. fs.createReadStream(cloudinaryUrl) fails — it's not a local file
+//     3. We can't forward the file buffer to Flask for validation
+//     4. We can't delete invalid files before they're stored
+//
+// With memoryStorage:
+//     1. req.files[x].buffer = raw bytes — forward directly to Flask
+//     2. If Flask validates OK → upload buffer to Cloudinary manually
+//     3. If Flask rejects (403 GPS invalid) → buffer is discarded, nothing stored
+//
 const grievanceUpload = multer({
-  storage: new CloudinaryStorage({
-    cloudinary,
-    params: (_req, file) =>
-      file.fieldname === "image"
-        ? {
-          folder: "civic_connect/images",
-          allowed_formats: ["jpg", "jpeg", "png", "webp"],
-          transformation: [{ width: 1280, crop: "limit", quality: "auto" }],
-        }
-        : { folder: "civic_connect/audio", resource_type: "video" },
-  }),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  storage: multer.memoryStorage(),
+  limits:  { fileSize: 10 * 1024 * 1024 },   // 10 MB per file
 });
+
+// ── Cloudinary upload helper ──────────────────────────────────────────────────
+// Called ONLY after Flask confirms the submission is valid.
+async function uploadToCloudinary(buffer, mimetype, originalname) {
+  const isAudio      = mimetype?.startsWith("audio") || mimetype?.startsWith("video");
+  const resourceType = isAudio ? "video" : "image";   // Cloudinary uses "video" for audio
+  const folder       = isAudio ? "civic_connect/audio" : "civic_connect/images";
+
+  return new Promise((resolve, reject) => {
+    const uploadOptions = { folder, resource_type: resourceType };
+
+    // Apply image transformations only for images
+    if (!isAudio) {
+      uploadOptions.transformation = [{ width: 1280, crop: "limit", quality: "auto" }];
+      uploadOptions.allowed_formats = ["jpg", "jpeg", "png", "webp"];
+    }
+
+    const stream = cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
+      if (error) return reject(error);
+      resolve(result.secure_url);
+    });
+
+    stream.end(buffer);
+  });
+}
+
+// ── Cloudinary delete helper ──────────────────────────────────────────────────
+const extractCloudinaryPublicId = (url) => {
+  if (!url) return null;
+  const parts  = url.split("/");
+  const file   = parts.at(-1).split(".")[0];
+  const folder = parts.at(-2);
+  return `${folder}/${file}`;
+};
 
 // =============================
 // 🗄️ DATABASE
 // =============================
 const MONGO_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/civic_connect";
-
 mongoose
   .connect(MONGO_URI)
   .then(() => console.log(`✅ Connected to ${MONGO_URI.includes("localhost") || MONGO_URI.includes("127.0.0.1") ? "Localhost" : "Atlas"} MongoDB`))
@@ -144,91 +169,58 @@ mongoose
 // 🔢 HELPERS
 // =============================
 const generateOTP = () => crypto.randomInt(100_000, 999_999).toString();
-
-const mapUrgencyToPriority = (urgency = "") =>
-  PRIORITY_MAP[urgency.toLowerCase()] ?? "Medium";
-
+const mapUrgencyToPriority = (urgency = "") => PRIORITY_MAP[urgency.toLowerCase()] ?? "Medium";
 const normaliseUrgency = (u) => {
   const v = (u || "").toLowerCase().trim();
   if (v === "immediate") return "critical";
   return FLASK_VALID_URGENCY.has(v) ? v : "medium";
 };
-
 const signToken = (user) =>
   jwt.sign(
     { id: user._id, email: user.email, role: user.role, name: user.fullName || user.name || "" },
-    JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN },
+    JWT_SECRET, { expiresIn: JWT_EXPIRES_IN },
   );
-
 const signRefreshToken = (userId) =>
   jwt.sign({ id: userId, type: "refresh" }, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN });
-
 const issueTokens = (res, user) => {
-  const token = signToken(user);
+  const token        = signToken(user);
   const refreshToken = signRefreshToken(user._id);
-  res.cookie("access_token", token, COOKIE_OPTS);
+  res.cookie("access_token",  token,        COOKIE_OPTS);
   res.cookie("refresh_token", refreshToken, REFRESH_COOKIE_OPTS);
   return { token, refreshToken };
 };
-
-/** Extract + verify a Bearer JWT; returns { payload } or { error } */
 const verifyBearer = (authHeader) => {
   if (!authHeader?.startsWith("Bearer ")) return { error: "No token provided" };
-  try {
-    return { payload: jwt.verify(authHeader.slice(7), JWT_SECRET) };
-  } catch (err) {
-    return { error: err.name === "TokenExpiredError" ? "Token expired" : "Invalid token" };
-  }
+  try { return { payload: jwt.verify(authHeader.slice(7), JWT_SECRET) }; }
+  catch (err) { return { error: err.name === "TokenExpiredError" ? "Token expired" : "Invalid token" }; }
 };
-
 const sanitizeTokens = (tokens) =>
   Array.isArray(tokens)
     ? tokens.filter(t => t.token && typeof t.impact === "number").map(({ token, impact }) => ({ token, impact }))
     : [];
 
-const extractCloudinaryPublicId = (url) => {
-  if (!url) return null;
-  const parts = url.split("/");
-  const file = parts.at(-1).split(".")[0];
-  const folder = parts.at(-2);
-  return `${folder}/${file}`;
-};
-
 // =============================
 // 🔐 AUTH MIDDLEWARE
 // =============================
 const verifyToken = (req, res, next) => {
-  // 1) Authorization header
   const { payload, error } = verifyBearer(req.headers.authorization);
   if (payload) { req.user = payload; return next(); }
-
-  // 2) Cookie fallback
   const cookieToken = req.cookies?.access_token;
   if (cookieToken) {
-    try {
-      req.user = jwt.verify(cookieToken, JWT_SECRET);
-      return next();
-    } catch (err) {
+    try { req.user = jwt.verify(cookieToken, JWT_SECRET); return next(); }
+    catch (err) {
       return res.status(401).json({ success: false, message: err.name === "TokenExpiredError" ? "Token expired" : "Invalid token" });
     }
   }
-
   res.status(401).json({ success: false, message: error || "No token provided" });
 };
-
 const verifyAdmin = (req, res, next) =>
   verifyToken(req, res, () =>
-    req.user?.role === "admin"
-      ? next()
-      : res.status(403).json({ success: false, message: "Admin access required" })
+    req.user?.role === "admin" ? next() : res.status(403).json({ success: false, message: "Admin access required" })
   );
-
 const verifyCitizen = (req, res, next) =>
   verifyToken(req, res, () =>
-    req.user?.role === "citizen"
-      ? next()
-      : res.status(403).json({ success: false, message: "Citizen access required" })
+    req.user?.role === "citizen" ? next() : res.status(403).json({ success: false, message: "Citizen access required" })
   );
 
 // =============================
@@ -248,7 +240,7 @@ const buildOtpEmail = (otp) => `
       <div style="font-size:34px;font-weight:700;letter-spacing:10px;color:#000;">${otp}</div>
     </div>
     <p style="margin:20px 0 5px;font-size:13px;color:#555;">This code is valid for <strong>5 minutes</strong>.</p>
-    <p style="margin:0;font-size:12px;color:#777;">Do not share this code with anyone. This is an automated system notification.</p>
+    <p style="margin:0;font-size:12px;color:#777;">Do not share this code with anyone.</p>
     <div style="margin-top:35px;font-size:11px;color:#888;border-top:1px solid #eaeaea;padding-top:15px;">
       © ${new Date().getFullYear()} Civic Connect Portal<br/>Municipal Digital Services Platform
     </div>
@@ -258,40 +250,32 @@ const buildOtpEmail = (otp) => `
 // =============================
 // ⚖️ GFAS FAIRNESS HELPERS
 // =============================
-const clamp100 = (v) => Math.min(100, Math.max(0, Number(v) || 0));
-const gapToScore = (gap) => gap == null ? 100 : clamp100(100 - Number(gap) * 200);
-
-const scoreSeverity = (score) =>
-  score >= 80 ? "ok" : score >= 60 ? "warning" : "critical";
+const clamp100    = (v) => Math.min(100, Math.max(0, Number(v) || 0));
+const gapToScore  = (gap) => gap == null ? 100 : clamp100(100 - Number(gap) * 200);
+const scoreSeverity = (score) => score >= 80 ? "ok" : score >= 60 ? "warning" : "critical";
 
 const parseDimension = (block, dim) => {
   const EMPTY = { fairnessScore: 100, breakdown: [], flagged: [], average: 0, disparitySummary: {}, flagsRaised: 0 };
   if (!block || typeof block !== "object") return EMPTY;
-
-  const groupMetrics = block.group_metrics ?? {};
+  const groupMetrics    = block.group_metrics    ?? {};
   const disparitySummary = block.disparity_summary ?? {};
-  const fairnessFlags = block.fairness_flags ?? [];
-  const flagsRaised = block.flags_raised ?? fairnessFlags.length;
-
+  const fairnessFlags   = block.fairness_flags   ?? [];
+  const flagsRaised     = block.flags_raised     ?? fairnessFlags.length;
   const { statistical_parity_gap: parityGap, equal_opportunity_tpr_gap: tprGap, mean_priority_score_gap: priorityGap } = disparitySummary;
-
-  const subScores = [parityGap, tprGap, priorityGap].filter(g => g != null).map(gapToScore);
+  const subScores    = [parityGap, tprGap, priorityGap].filter(g => g != null).map(gapToScore);
   const fairnessScore = subScores.length ? clamp100(Math.min(...subScores)) : 100;
-
   const breakdown = Object.entries(groupMetrics).map(([groupName, m]) => ({
     [dim]: groupName,
-    resolutionRate: clamp100((m.statistical_parity ?? 0) * 100),
-    total: m.count ?? null,
+    resolutionRate:    clamp100((m.statistical_parity ?? 0) * 100),
+    total:             m.count ?? null,
     statisticalParity: m.statistical_parity ?? null,
-    tpr: m.equal_opportunity_tpr ?? null,
+    tpr:               m.equal_opportunity_tpr ?? null,
     meanPriorityScore: m.mean_priority_score ?? null,
   })).sort((a, b) => a.resolutionRate - b.resolutionRate);
-
   const parityValues = breakdown.map(b => b.statisticalParity ?? 0);
-  const meanParity = parityValues.length ? parityValues.reduce((s, v) => s + v, 0) / parityValues.length : 0;
+  const meanParity   = parityValues.length ? parityValues.reduce((s, v) => s + v, 0) / parityValues.length : 0;
   const flagged = breakdown.filter(b => (b.statisticalParity ?? meanParity) < meanParity - 0.10).map(b => b[dim]);
   const average = clamp100(meanParity * 100);
-
   return { fairnessScore, breakdown, flagged, average, disparitySummary, flagsRaised };
 };
 
@@ -299,11 +283,11 @@ const buildAlerts = (dimResults) => {
   const dimLabel = { area: "Area", category: "Category", language: "Language" };
   return Object.entries(dimResults).flatMap(([dim, d]) => {
     if (d.fairnessScore >= 80) return [];
-    const label = dimLabel[dim] ?? dim;
-    const flaggedStr = d.flagged.length ? ` Affected groups: ${d.flagged.slice(0, 3).join(", ")}${d.flagged.length > 3 ? ` +${d.flagged.length - 3} more` : ""}.` : "";
+    const label      = dimLabel[dim] ?? dim;
+    const flaggedStr = d.flagged.length ? ` Affected groups: ${d.flagged.slice(0,3).join(", ")}${d.flagged.length > 3 ? ` +${d.flagged.length-3} more` : ""}.` : "";
     const metricMsgs = [];
-    if (d.disparitySummary.statistical_parity_gap > 0.20) metricMsgs.push(`urgency-rate gap of ${(d.disparitySummary.statistical_parity_gap * 100).toFixed(1)}%`);
-    if (d.disparitySummary.equal_opportunity_tpr_gap > 0.20) metricMsgs.push(`detection-rate gap of ${(d.disparitySummary.equal_opportunity_tpr_gap * 100).toFixed(1)}%`);
+    if (d.disparitySummary.statistical_parity_gap > 0.20) metricMsgs.push(`urgency-rate gap of ${(d.disparitySummary.statistical_parity_gap*100).toFixed(1)}%`);
+    if (d.disparitySummary.equal_opportunity_tpr_gap > 0.20) metricMsgs.push(`detection-rate gap of ${(d.disparitySummary.equal_opportunity_tpr_gap*100).toFixed(1)}%`);
     if (d.disparitySummary.mean_priority_score_gap > 0.20) metricMsgs.push(`priority-score gap of ${d.disparitySummary.mean_priority_score_gap.toFixed(3)}`);
     const metricStr = metricMsgs.length ? ` (${metricMsgs.join("; ")})` : "";
     const message = d.fairnessScore < 60
@@ -315,250 +299,258 @@ const buildAlerts = (dimResults) => {
 
 const buildRecommendations = (dimResults, globalAvg) => {
   const titleMap = {
-    area: "Improve urgency detection in under-served areas",
+    area:     "Improve urgency detection in under-served areas",
     category: "Address priority scoring gap across grievance categories",
     language: "Ensure equitable urgency classification by submission language",
   };
   const descTemplate = (dim, d) => {
-    const flaggedStr = d.flagged.length ? ` (${d.flagged.slice(0, 2).join(", ")}${d.flagged.length > 2 ? " and others" : ""})` : "";
+    const flaggedStr = d.flagged.length ? ` (${d.flagged.slice(0,2).join(", ")}${d.flagged.length > 2 ? " and others" : ""})` : "";
     const { statistical_parity_gap: pg, equal_opportunity_tpr_gap: tg } = d.disparitySummary;
     const details = [];
-    if (pg != null && pg > 0.20) details.push(`a ${(pg * 100).toFixed(1)}% urgency-rate disparity`);
-    if (tg != null && tg > 0.20) details.push(`a ${(tg * 100).toFixed(1)}% detection-rate gap for truly urgent cases`);
+    if (pg != null && pg > 0.20) details.push(`a ${(pg*100).toFixed(1)}% urgency-rate disparity`);
+    if (tg != null && tg > 0.20) details.push(`a ${(tg*100).toFixed(1)}% detection-rate gap for truly urgent cases`);
     const detailStr = details.length ? ` The audit found ${details.join(" and ")}.` : "";
     const templates = {
-      area: `Some areas${flaggedStr} show significantly lower urgent-grievance detection rates than the district average.${detailStr} Prioritise outreach and staff allocation to these localities.`,
+      area:     `Some areas${flaggedStr} show significantly lower urgent-grievance detection rates than the district average.${detailStr} Prioritise outreach and staff allocation to these localities.`,
       category: `Certain categories${flaggedStr} have a priority scoring gap well below the overall average.${detailStr} Review staff skill allocation and escalation workflows for these complaint types.`,
       language: `Grievances submitted in certain languages${flaggedStr} receive lower urgency scores.${detailStr} Consider multilingual staff or translation-assisted workflows to remove language barriers.`,
     };
     return templates[dim] ?? `Fairness score for ${dim}: ${d.fairnessScore}.`;
   };
-
   return Object.entries(dimResults)
     .filter(([, d]) => d.fairnessScore < 80)
     .sort((a, b) => a[1].fairnessScore - b[1].fairnessScore)
     .map(([dim, d]) => ({
-      priority: d.fairnessScore < 60 ? "high" : "medium",
-      title: titleMap[dim] ?? `Review ${dim} fairness`,
+      priority:    d.fairnessScore < 60 ? "high" : "medium",
+      title:       titleMap[dim] ?? `Review ${dim} fairness`,
       description: descTemplate(dim, d),
-      dimension: dim,
-      affectedArea: d.flagged.slice(0, 2).join(", ") || null,
+      dimension:   dim,
+      affectedArea: d.flagged.slice(0,2).join(", ") || null,
     }));
 };
 
 const transformFlaskResponse = (flaskData, totalGrievances, avgResolutionRate) => {
-  const audit = flaskData.fairness_audit ?? flaskData;
+  const audit   = flaskData.fairness_audit ?? flaskData;
   const results = audit.results ?? audit ?? {};
-
-  const area = parseDimension(results.area ?? null, "area");
+  const area     = parseDimension(results.area     ?? null, "area");
   const category = parseDimension(results.category ?? null, "category");
   const language = parseDimension(results.language ?? null, "language");
-
   const overallFairnessScore = clamp100((area.fairnessScore + category.fairnessScore + language.fairnessScore) / 3);
   const globalAvg = clamp100((area.average + category.average + language.average) / 3);
-
   const allGaps = [area, category, language].flatMap(d => Object.values(d.disparitySummary).filter(v => v != null));
   const disparityIndex = allGaps.length ? Number(Math.max(...allGaps).toFixed(4)) : null;
-
   const dimResults = { area, category, language };
-
   return {
-    overallFairnessScore,
-    area, category, language,
-    summary: {
-      totalGrievances: audit.total_grievances ?? totalGrievances,
-      avgResolutionRate,
-      disparityIndex,
-    },
-    alerts: buildAlerts(dimResults),
+    overallFairnessScore, area, category, language,
+    summary: { totalGrievances: audit.total_grievances ?? totalGrievances, avgResolutionRate, disparityIndex },
+    alerts:          buildAlerts(dimResults),
     recommendations: buildRecommendations(dimResults, globalAvg),
-    generatedAt: new Date().toISOString(),
+    generatedAt:     new Date().toISOString(),
   };
 };
 
-
 // =============================
-// 🚨 HOTSPOT HELPER
+// 🚨 HOTSPOT HELPERS
 // =============================
-
-/**
- * Slim each grievance to exactly the 4 fields Flask /hotspot-forecast uses:
- *
- *   area, category  → groupby keys
- *   createdAt       → pd.to_datetime(utc=True) → Prophet "ds" column
- *   priorityScore   → averaged per bucket for risk_score calculation
- *
- * Flask also filters rows by VALID_LABELS:
- *   ["electricity","garbage","pollution","public transport",
- *    "roads","sanitation","stray animals","water"]
- * Records with any other category (e.g. "other") are silently dropped by Flask.
- *
- * Flask requires ≥2 unique dates per area+category pair to run Prophet.
- * We keep full ISO strings so pd.to_datetime(utc=True) parses correctly.
- * Dropping every field beyond these 4 cuts payload ~80% (115 KB → ~22 KB).
- */
-
-// Must match Flask's VALID_LABELS exactly — anything else is silently dropped
 const FLASK_HOTSPOT_VALID_LABELS = new Set([
-  "electricity", "garbage", "pollution", "public transport",
-  "roads", "sanitation", "stray animals", "water",
+  "electricity","garbage","pollution","public transport",
+  "roads","sanitation","stray animals","water",
 ]);
 
 function buildHotspotPayload(grievances) {
   const rows = [];
   for (const g of grievances) {
-    const area = (g.area || "").toLowerCase().trim();
+    const area     = (g.area || "").toLowerCase().trim();
     const category = (g.category || "").toLowerCase().trim();
-
-    // Pre-filter: skip categories Flask will silently drop anyway
     if (!FLASK_HOTSPOT_VALID_LABELS.has(category)) continue;
-
     rows.push({
-      area,
-      category,
-      // Full ISO string — Flask does pd.to_datetime(utc=True) on this field
-      createdAt: g.createdAt instanceof Date
-        ? g.createdAt.toISOString()
-        : String(g.createdAt),
-      // Flask averages this per bucket for the risk_score formula
-      priorityScore: typeof g.priorityScore === "number"
-        ? Number(g.priorityScore.toFixed(3))
-        : 0,
+      area, category,
+      createdAt:     g.createdAt instanceof Date ? g.createdAt.toISOString() : String(g.createdAt),
+      priorityScore: typeof g.priorityScore === "number" ? Number(g.priorityScore.toFixed(3)) : 0,
     });
   }
   return rows;
 }
 
-/**
- * Map one Flask hotspot entry → HotspotAlert document shape.
- * Stores the full raw Flask response for audit / replay.
- */
 function normaliseHotspot(h, flaskSnapshot) {
   const risk = Number((h.risk_score <= 1 ? h.risk_score * 100 : h.risk_score).toFixed(2));
   let level = "Low";
   if (risk >= 80) level = "Critical";
   else if (risk >= 60) level = "High";
   else if (risk >= 40) level = "Medium";
-
   return {
-    // ── Fields that exactly match HotspotAlert schema ─────────────────────
-    area: h.area,
-    category: h.category,
-    riskScore: risk,
-    level,
-    growthPercent: Number((h.growth_percent ?? 0).toFixed(2)),
-    sourceWindowDays: 45,    // matches the cutoff used in triggerHotspotCheck
-    forecastHorizonDays: 7,     // matches horizon_days sent to Flask
-    confidenceScore: h.confidence != null
-      ? Math.min(1, Math.max(0, Number(h.confidence)))
-      : 0.75,                     // schema default
-    isResolved: false,
-    // flaskSnapshot stored for audit — added to schema below
-    flaskSnapshot,
+    area: h.area, category: h.category, riskScore: risk, level,
+    growthPercent:       Number((h.growth_percent ?? 0).toFixed(2)),
+    sourceWindowDays:    45,
+    forecastHorizonDays: 7,
+    confidenceScore:     h.confidence != null ? Math.min(1, Math.max(0, Number(h.confidence))) : 0.75,
+    isResolved: false, flaskSnapshot,
   };
 }
 
-async function triggerHotspotCheck() {
-  // 1. Fetch recent grievances
+async function triggerHotspotCheck({
+  horizonDays   = 7,
+  topN          = 20,
+  sourceWindow  = 45,   // mirrors schema.sourceWindowDays + Flask source_window_days
+} = {}) {
+
+  // ── 1. Fetch grievances within the source window ──────────────────────────
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 45);
+  cutoff.setDate(cutoff.getDate() - sourceWindow);
 
   const grievances = await Grievance.find({ createdAt: { $gte: cutoff } })
     .select("area category createdAt priorityScore")
     .lean();
 
   if (!grievances.length) {
-    console.log("[hotspot] No grievances in last 45 days — skipping.");
-    return { inserted: 0, skipped: 0 };
+    console.log(`[hotspot] No grievances in last ${sourceWindow} days.`);
+    return { inserted: 0, skipped: 0, errors: [] };
   }
 
-  // 2. Slim payload — keeps per-row temporal signal, pre-filters invalid categories
-  const slimmed = buildHotspotPayload(grievances);
+  // ── 2. Slim + validate payload ────────────────────────────────────────────
+  const slimmed     = buildHotspotPayload(grievances);   // your existing helper
   const filteredOut = grievances.length - slimmed.length;
-  const approxKB = Math.round(JSON.stringify(slimmed).length / 1024);
-  console.log(`[hotspot] ${grievances.length} grievances → ${slimmed.length} valid rows (~${approxKB} KB) | ${filteredOut} filtered (invalid category)`);
+  const approxKB    = Math.round(JSON.stringify(slimmed).length / 1024);
+
+  console.log(
+    `[hotspot] ${grievances.length} → ${slimmed.length} valid rows (~${approxKB} KB)` +
+    ` | ${filteredOut} filtered`
+  );
 
   if (slimmed.length < 2) {
-    console.log("[hotspot] Too few valid rows for Prophet — check category values in DB.");
-    return { inserted: 0, skipped: 0 };
+    console.log("[hotspot] Too few valid rows for Prophet.");
+    return { inserted: 0, skipped: 0, errors: [] };
   }
 
-  // 3. Call Flask
+  // ── 3. Call Flask ─────────────────────────────────────────────────────────
   let flaskData;
   try {
     const { data } = await axios.post(
       `${FLASK_URL}/hotspot-forecast`,
-      { grievances: slimmed, horizon_days: 7, top_n: 20 },
-      { timeout: 50_000 },   // parallel Prophet: ~3–8 s for 300+ groups
+      {
+        grievances:        slimmed,
+        horizon_days:      horizonDays,
+        top_n:             topN,
+        source_window_days: sourceWindow,   // ← new param Flask now reads
+      },
+      { timeout: 60_000 },
     );
     flaskData = data;
   } catch (err) {
-    const reason = err.code === "ECONNABORTED" ? "timeout after 20 s" : (err.code || err.message);
+    const reason = err.code === "ECONNABORTED"
+      ? `timeout after 60s`
+      : (err.code || err.message);
     console.error(`[hotspot] Flask call failed — ${reason}`);
     throw err;
   }
 
-  const hotspots = flaskData.top_hotspots || [];
-  if (!hotspots.length) {
-    console.log("[hotspot] Flask returned no hotspots.");
-    return { inserted: 0, skipped: 0 };
+  // ── 4. Guard: Flask-level failure ─────────────────────────────────────────
+  if (flaskData.status !== "success") {
+    console.error(`[hotspot] Flask returned failure: ${flaskData.message}`);
+    throw new Error(`Flask hotspot-forecast failed: ${flaskData.message}`);
   }
 
-  // 4. Deduplicate against open alerts already in DB (all levels, no risk filter)
+  const hotspots   = flaskData.top_hotspots || [];
+  const flaskMeta  = flaskData.meta         || {};
+  const flaskErrors = flaskMeta.errors      || [];   // structured error list from Flask
+
+  if (flaskErrors.length) {
+    console.warn(
+      `[hotspot] ⚠️  Flask reported ${flaskErrors.length} Prophet failure(s):`,
+      flaskErrors
+    );
+  }
+
+  if (!hotspots.length) {
+    console.log("[hotspot] Flask returned no hotspots.");
+    return { inserted: 0, skipped: 0, errors: flaskErrors };
+  }
+
+  // ── 5. Upsert-guard: skip area+category combos already open ───────────────
   const existingKeys = new Set(
-    (await HotspotAlert.find({ isResolved: false }).select("area category").lean())
-      .map(a => `${a.area}_${a.category}`)
+    (await HotspotAlert.find({ isResolved: false })
+      .select("area category")
+      .lean()
+    ).map(a => `${a.area}__${a.category}`)
   );
 
-  // 5. Build insert list — ALL risk levels stored, only skip true duplicates
+  // ── 6. Build documents — every field maps to schema ───────────────────────
   const toInsert = hotspots
-    .map(h => normaliseHotspot(h, flaskData))
-    .filter(h => !existingKeys.has(`${h.area}_${h.category}`));
+    .map(h => ({
+      // ── Identity ──────────────────────────────────────────────────────────
+      area:     h.area.toLowerCase().trim(),      // schema: lowercase, trim
+      category: h.category.toLowerCase().trim(),  // schema: lowercase, trim, enum
+
+      // ── Risk metrics ──────────────────────────────────────────────────────
+      riskScore:    h.riskScore,        // Number 0–100  (sigmoid-scaled by Flask)
+      level:        h.level,            // enum ["Low","Medium","High","Critical"]
+      growthPercent: h.growthPercent,   // Number -500–500
+
+      // ── Forecast config ───────────────────────────────────────────────────
+      sourceWindowDays:    sourceWindow,          // days of history used
+      forecastHorizonDays: h.forecastHorizonDays, // days ahead forecast
+      confidenceScore:     h.confidenceScore,     // Number 0–1
+
+      // ── Full Flask audit snapshot (Mixed — preserves exact Flask output) ──
+      flaskSnapshot: h.flaskSnapshot ?? {
+        recentAvg:           h.recentAvg   ?? null,
+        forecastAvg:         h.forecastAvg ?? null,
+        sourceWindowDays:    sourceWindow,
+        forecastHorizonDays: horizonDays,
+        generatedAt:         flaskData.generated_at,
+      },
+
+      // ── Resolution (defaults) ─────────────────────────────────────────────
+      isResolved: false,
+      resolvedAt: null,
+    }))
+    .filter(h => !existingKeys.has(`${h.area}__${h.category}`));
 
   const skipped = hotspots.length - toInsert.length;
 
-  // 6. Bulk-insert
+  // ── 7. Persist ────────────────────────────────────────────────────────────
   if (toInsert.length) {
     await HotspotAlert.insertMany(toInsert, { ordered: false });
-    const byLevel = toInsert.reduce((acc, h) => { acc[h.level] = (acc[h.level] || 0) + 1; return acc; }, {});
-    console.log(`[hotspot] ✅ ${toInsert.length} alert(s) saved ${JSON.stringify(byLevel)} | ${skipped} skipped (already open)`);
+
+    const byLevel = toInsert.reduce((acc, h) => {
+      acc[h.level] = (acc[h.level] || 0) + 1;
+      return acc;
+    }, {});
+
+    console.log(
+      `[hotspot] ✅ ${toInsert.length} saved ${JSON.stringify(byLevel)}` +
+      ` | ${skipped} skipped (already open)` +
+      ` | Flask evaluated ${flaskMeta.groups_evaluated ?? "?"} groups`
+    );
   } else {
-    console.log(`[hotspot] No new alerts — all ${skipped} already open in DB.`);
+    console.log(`[hotspot] No new alerts — all ${skipped} already open.`);
   }
 
-  return { inserted: toInsert.length, skipped };
+  return {
+    inserted: toInsert.length,
+    skipped,
+    errors:   flaskErrors,   // propagate Flask Prophet failures to caller
+  };
 }
 
 // =================================================
-// 🌐 ROUTES — Health
+// 🌐 ROUTES
 // =================================================
-app.get("/", (_req, res) => res.send("Civic Connect API is running. Please use the /api endpoints."));
+app.get("/", (_req, res) => res.send("Civic Connect API is running."));
 
-// =================================================
-// 🔑 AUTH ROUTES
-// =================================================
+// ── AUTH ─────────────────────────────────────────────────────────────────────
 app.post("/api/auth/send-otp", async (req, res) => {
   try {
     const { email, mobileNumber } = req.body;
-    if (!email || !mobileNumber)
-      return res.status(400).json({ success: false, message: "Email & mobile required" });
-
+    if (!email || !mobileNumber) return res.status(400).json({ success: false, message: "Email & mobile required" });
     const otp = generateOTP();
-    // Upsert-style: delete old, create new (atomic enough for OTP)
     await Otp.deleteOne({ email });
-    await Otp.create({ email, mobileNumber, otp, expiresAt: new Date(Date.now() + 5 * 60_000), attempts: 0 });
-
+    await Otp.create({ email, mobileNumber, otp, expiresAt: new Date(Date.now() + 5*60_000), attempts: 0 });
     await sgMail.send({
-      to: email,
-      from: process.env.SENDGRID_VERIFIED_EMAIL,
-      subject: "OTP Verification – Civic Connect",
-      html: buildOtpEmail(otp),
-    }).catch(mailErr => {
-      console.error("❌ SendGrid Error:", mailErr.response?.body || mailErr);
-      throw Object.assign(new Error("Email delivery failed"), { isMailError: true });
-    });
-
-    console.log("📧 OTP email sent");
+      to: email, from: process.env.SENDGRID_VERIFIED_EMAIL,
+      subject: "OTP Verification – Civic Connect", html: buildOtpEmail(otp),
+    }).catch(mailErr => { console.error("❌ SendGrid:", mailErr.response?.body || mailErr); throw Object.assign(new Error("Email delivery failed"), { isMailError: true }); });
+    console.log("📧 OTP sent");
     res.json({ success: true, message: "OTP sent successfully" });
   } catch (err) {
     if (err.isMailError) return res.status(500).json({ success: false, message: "Email delivery failed" });
@@ -570,80 +562,48 @@ app.post("/api/auth/send-otp", async (req, res) => {
 app.post("/api/auth/verify-otp", async (req, res) => {
   try {
     const { email, otp, userData } = req.body;
-    if (!email || !otp || !userData)
-      return res.status(400).json({ success: false, message: "Missing required fields" });
-
+    if (!email || !otp || !userData) return res.status(400).json({ success: false, message: "Missing required fields" });
     const record = await Otp.findOne({ email });
-    if (!record) return res.json({ success: false, message: "OTP not found or expired" });
+    if (!record)                    return res.json({ success: false, message: "OTP not found or expired" });
     if (new Date() > record.expiresAt) return res.json({ success: false, message: "OTP expired" });
-    if (record.otp !== otp) return res.json({ success: false, message: "Invalid OTP" });
+    if (record.otp !== otp)         return res.json({ success: false, message: "Invalid OTP" });
     if (await User.exists({ email })) return res.json({ success: false, message: "User already exists. Please login." });
-
-    const [hashedPassword] = await Promise.all([
-      bcrypt.hash(userData.password, 12),
-      Otp.deleteOne({ email }),
-    ]);
-
+    const [hashedPassword] = await Promise.all([bcrypt.hash(userData.password, 12), Otp.deleteOne({ email })]);
     const newUser = await User.create({ ...userData, email: email.toLowerCase().trim(), password: hashedPassword, role: "citizen" });
     const { token, refreshToken } = issueTokens(res, newUser);
     const { password: _pw, ...safeUser } = newUser.toObject();
-
     res.status(201).json({ success: true, message: "Registration successful", token, refreshToken, user: safeUser });
-  } catch (err) {
-    console.error("[verify-otp]", err);
-    res.status(500).json({ success: false, message: err.message });
-  }
+  } catch (err) { console.error("[verify-otp]", err); res.status(500).json({ success: false, message: err.message }); }
 });
 
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password)
-      return res.status(400).json({ success: false, message: "Email & password required" });
-
+    if (!email || !password) return res.status(400).json({ success: false, message: "Email & password required" });
     const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) return res.status(401).json({ success: false, message: "No account found with this email" });
-
-    const isMatch = user.role === "admin"
-      ? password === user.password                     // plain text admin (existing behaviour)
-      : await bcrypt.compare(password, user.password); // bcrypt for citizens
-
+    const isMatch = user.role === "admin" ? password === user.password : await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ success: false, message: "Incorrect password" });
-
     const { token, refreshToken } = issueTokens(res, user);
     const { password: _pw, ...safeUser } = user.toObject();
-
     res.json({ success: true, token, refreshToken, user: safeUser, role: user.role });
-  } catch (err) {
-    console.error("[login]", err);
-    res.status(500).json({ success: false, message: "Login failed" });
-  }
+  } catch (err) { console.error("[login]", err); res.status(500).json({ success: false, message: "Login failed" }); }
 });
 
 app.post("/api/auth/refresh", async (req, res) => {
   try {
     const refreshToken = req.body.refreshToken || req.cookies?.refresh_token;
     if (!refreshToken) return res.status(400).json({ success: false, message: "Refresh token required" });
-
     let payload;
-    try {
-      payload = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
-    } catch (err) {
-      return res.status(401).json({ success: false, message: err.name === "TokenExpiredError" ? "Refresh token expired, please login again" : "Invalid refresh token" });
-    }
-
+    try { payload = jwt.verify(refreshToken, JWT_REFRESH_SECRET); }
+    catch (err) { return res.status(401).json({ success: false, message: err.name === "TokenExpiredError" ? "Refresh token expired" : "Invalid refresh token" }); }
     if (payload.type !== "refresh") return res.status(401).json({ success: false, message: "Invalid token type" });
-
     const user = await User.findById(payload.id).select("-password");
     if (!user) return res.status(401).json({ success: false, message: "User not found" });
-
     const newToken = signToken(user);
     res.cookie("access_token", newToken, COOKIE_OPTS);
     res.json({ success: true, token: newToken });
-  } catch (err) {
-    console.error("[refresh]", err);
-    res.status(500).json({ success: false, message: "Token refresh failed" });
-  }
+  } catch (err) { console.error("[refresh]", err); res.status(500).json({ success: false, message: "Token refresh failed" }); }
 });
 
 app.get("/api/auth/me", verifyToken, async (req, res) => {
@@ -651,21 +611,17 @@ app.get("/api/auth/me", verifyToken, async (req, res) => {
     const user = await User.findById(req.user.id).select("-password -__v");
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
     res.json({ success: true, user });
-  } catch {
-    res.status(500).json({ success: false, message: "Failed to fetch profile" });
-  }
+  } catch { res.status(500).json({ success: false, message: "Failed to fetch profile" }); }
 });
 
 app.put("/api/auth/me", verifyToken, async (req, res) => {
   try {
-    const ALLOWED = ["fullName", "name", "mobileNumber", "address"];
+    const ALLOWED = ["fullName","name","mobileNumber","address"];
     const update = Object.fromEntries(Object.entries(req.body).filter(([k]) => ALLOWED.includes(k)));
     if (!Object.keys(update).length) return res.status(400).json({ success: false, message: "No valid fields to update" });
     const updated = await User.findByIdAndUpdate(req.user.id, { $set: update }, { new: true, runValidators: true }).select("-password -__v");
     res.json({ success: true, user: updated });
-  } catch {
-    res.status(500).json({ success: false, message: "Profile update failed" });
-  }
+  } catch { res.status(500).json({ success: false, message: "Profile update failed" }); }
 });
 
 app.post("/api/auth/change-password", verifyToken, async (req, res) => {
@@ -673,21 +629,17 @@ app.post("/api/auth/change-password", verifyToken, async (req, res) => {
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) return res.status(400).json({ success: false, message: "Both passwords required" });
     if (newPassword.length < 6) return res.status(400).json({ success: false, message: "Password must be at least 6 characters" });
-
     const user = await User.findById(req.user.id);
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) return res.status(401).json({ success: false, message: "Current password is incorrect" });
-
     user.password = await bcrypt.hash(newPassword, 12);
     await user.save();
     res.json({ success: true, message: "Password updated successfully" });
-  } catch {
-    res.status(500).json({ success: false, message: "Password change failed" });
-  }
+  } catch { res.status(500).json({ success: false, message: "Password change failed" }); }
 });
 
 app.post("/api/auth/logout", verifyToken, (_req, res) => {
-  res.clearCookie("access_token", { path: "/" });
+  res.clearCookie("access_token",  { path: "/" });
   res.clearCookie("refresh_token", { path: "/api/auth/refresh" });
   res.json({ success: true, message: "Logged out successfully" });
 });
@@ -697,74 +649,46 @@ app.get("/api/auth/check", verifyToken, async (req, res) => {
     const user = await User.findById(req.user.id).select("fullName email role isVerified").lean();
     if (!user) return res.status(401).json({ success: false, isSignedIn: false, message: "User not found" });
     res.json({ success: true, isSignedIn: true, role: user.role, user: { id: req.user.id, name: user.fullName, email: user.email, role: user.role, isVerified: user.isVerified } });
-  } catch {
-    res.status(500).json({ success: false, isSignedIn: false, message: "Auth check failed" });
-  }
+  } catch { res.status(500).json({ success: false, isSignedIn: false, message: "Auth check failed" }); }
 });
 
-// =================================================
-// ⚖️ FAIRNESS AUDIT
-// =================================================
+// ── FAIRNESS AUDIT ────────────────────────────────────────────────────────────
 app.get("/api/fairness-audit", verifyAdmin, async (req, res) => {
   try {
-    const grievances = await Grievance.find({})
-      .select("area category language status urgency priorityScore")
-      .lean();
-
+    const grievances = await Grievance.find({}).select("area category language status urgency priorityScore").lean();
     const emptyAudit = () => ({
       overallFairnessScore: 100,
-      area: { fairnessScore: 100, breakdown: [], flagged: [], average: 0 },
+      area:     { fairnessScore: 100, breakdown: [], flagged: [], average: 0 },
       category: { fairnessScore: 100, breakdown: [], flagged: [], average: 0 },
       language: { fairnessScore: 100, breakdown: [], flagged: [], average: 0 },
       summary: { totalGrievances: grievances.length, avgResolutionRate: 0, disparityIndex: null },
-      alerts: [], recommendations: [],
-      generatedAt: new Date().toISOString(),
+      alerts: [], recommendations: [], generatedAt: new Date().toISOString(),
     });
-
     if (!grievances.length) return res.json({ success: true, data: emptyAudit() });
-
-    const totalGrievances = grievances.length;
-    const resolvedCount = grievances.filter(g => g.status === "Resolved").length;
+    const totalGrievances  = grievances.length;
+    const resolvedCount    = grievances.filter(g => g.status === "Resolved").length;
     const avgResolutionRate = (resolvedCount / totalGrievances) * 100;
-
-    // Filter to records Flask can process
-    const skipped = [];
-    const flaskRecords = [];
-
+    const skipped = [], flaskRecords = [];
     for (const g of grievances) {
       const rawArea = (g.area || "").trim().toLowerCase();
       if (!FLASK_VALID_AREAS.has(rawArea)) { skipped.push({ id: g._id, reason: `area: "${rawArea}"` }); continue; }
-
-      const rawCategory = (g.category || "").trim().toLowerCase();
+      const rawCategory    = (g.category || "").trim().toLowerCase();
       const mappedCategory = CATEGORY_MAP[rawCategory] ?? rawCategory;
       if (!FLASK_VALID_CATEGORIES.has(mappedCategory)) { skipped.push({ id: g._id, reason: `category: "${rawCategory}"` }); continue; }
-
       const rawLanguage = (g.language || "english").trim().toLowerCase();
-
       flaskRecords.push({
-        area: rawArea,
-        category: mappedCategory,
-        language: FLASK_VALID_LANGUAGES.has(rawLanguage) ? rawLanguage : "english",
+        area: rawArea, category: mappedCategory,
+        language:          FLASK_VALID_LANGUAGES.has(rawLanguage) ? rawLanguage : "english",
         predicted_urgency: normaliseUrgency(g.urgency),
-        true_urgency: normaliseUrgency(g.urgency),
-        priority_score: typeof g.priorityScore === "number" && isFinite(g.priorityScore) ? g.priorityScore : 0,
+        true_urgency:      normaliseUrgency(g.urgency),
+        priority_score:    typeof g.priorityScore === "number" && isFinite(g.priorityScore) ? g.priorityScore : 0,
       });
     }
-
-    if (skipped.length) console.warn(`[fairness-audit] Skipped ${skipped.length}/${totalGrievances}:`, skipped.slice(0, 5));
-
+    if (skipped.length) console.warn(`[fairness-audit] Skipped ${skipped.length}/${totalGrievances}:`, skipped.slice(0,5));
     if (!flaskRecords.length) {
       const uniqueReasons = [...new Set(skipped.map(s => s.reason.split(":")[0]))];
-      return res.json({
-        success: true,
-        data: {
-          ...emptyAudit(),
-          summary: { totalGrievances, avgResolutionRate: Math.round(avgResolutionRate * 10) / 10, disparityIndex: null, skippedRecords: skipped.length },
-          alerts: [{ severity: "warning", message: `${skipped.length} of ${totalGrievances} grievances excluded. Unrecognised fields: ${uniqueReasons.join(", ")}.`, dimension: null }],
-        },
-      });
+      return res.json({ success: true, data: { ...emptyAudit(), summary: { totalGrievances, avgResolutionRate: Math.round(avgResolutionRate*10)/10, disparityIndex: null, skippedRecords: skipped.length }, alerts: [{ severity: "warning", message: `${skipped.length} of ${totalGrievances} grievances excluded. Unrecognised: ${uniqueReasons.join(", ")}.`, dimension: null }] } });
     }
-
     let flaskRaw;
     try {
       const { data } = await axios.post(
@@ -775,30 +699,23 @@ app.get("/api/fairness-audit", verifyAdmin, async (req, res) => {
       flaskRaw = data.data ?? data.result ?? data;
     } catch (flaskErr) {
       console.error("[fairness-audit] Flask error:", flaskErr.message);
-      const status = flaskErr.response?.status;
+      const status  = flaskErr.response?.status;
       const message = flaskErr.response?.data?.message ?? (status ? `ML service returned HTTP ${status}` : `ML service unreachable at ${FLASK_URL}`);
       return res.status(502).json({ success: false, message });
     }
-
     const transformed = transformFlaskResponse(flaskRaw, totalGrievances, avgResolutionRate);
     console.log(`[fairness-audit] Score: ${transformed.overallFairnessScore} | Alerts: ${transformed.alerts.length}`);
     res.json({ success: true, data: transformed });
-  } catch (err) {
-    console.error("[fairness-audit]", err);
-    res.status(500).json({ success: false, message: "Internal server error during fairness audit." });
-  }
+  } catch (err) { console.error("[fairness-audit]", err); res.status(500).json({ success: false, message: "Internal server error during fairness audit." }); }
 });
 
-// =================================================
-// 🚨 HOTSPOT ALERTS
-// =================================================
+// ── HOTSPOT ALERTS ────────────────────────────────────────────────────────────
 app.post("/api/admin/hotspot-alerts", verifyAdmin, async (req, res) => {
   try {
     const result = await triggerHotspotCheck();
-    res.json({ success: true, message: `Hotspot check complete — ${result.inserted} alert(s) saved, ${result.skipped} skipped`, data: result });
+    res.json({ success: true, message: `Hotspot check complete — ${result.inserted} saved, ${result.skipped} skipped`, data: result });
   } catch (err) {
     const reason = err.code === "ECONNABORTED" ? "ML service timeout" : err.message;
-    console.error(`[hotspot] POST trigger failed — ${reason}`);
     res.status(502).json({ success: false, message: `Hotspot check failed: ${reason}` });
   }
 });
@@ -807,232 +724,362 @@ app.get("/api/admin/hotspot-alerts", verifyAdmin, async (req, res) => {
   try {
     const alerts = await HotspotAlert.find({ isResolved: false }).sort({ createdAt: -1 }).limit(20).lean();
     res.json({ success: true, data: alerts });
-  } catch (err) {
-    console.error("[hotspot-get]", err);
-    res.status(500).json({ success: false, message: "Failed to fetch hotspot alerts" });
-  }
+  } catch (err) { console.error("[hotspot-get]", err); res.status(500).json({ success: false, message: "Failed to fetch hotspot alerts" }); }
 });
 
-// =================================================
-// 📋 GRIEVANCE ROUTES
-// =================================================
+// ── GRIEVANCES ────────────────────────────────────────────────────────────────
 app.get("/api/grievances", verifyToken, async (req, res) => {
   try {
     const { status, priority, category, area, search, sort = "newest", page = "1", limit = "50" } = req.query;
     const filter = {};
-
     if (req.user.role === "citizen") filter.userEmail = req.user.email;
-    if (status && status !== "All") filter.status = status;
-    if (priority && priority !== "All") filter.priority = priority === "Critical" ? { $in: ["Critical", "Immediate"] } : priority;
+    if (status   && status   !== "All") filter.status   = status;
+    if (priority && priority !== "All") filter.priority = priority === "Critical" ? { $in: ["Critical","Immediate"] } : priority;
     if (category && category !== "All") {
-      const knownCats = ["Electricity", "Garbage", "Pollution", "Public Transport", "Roads", "Sanitation", "Stray Animals", "Water"];
+      const knownCats = ["Electricity","Garbage","Pollution","Public Transport","Roads","Sanitation","Stray Animals","Water"];
       filter.category = category === "Others" ? { $nin: knownCats } : category;
     }
-    if (area) filter.area = { $regex: area, $options: "i" };
+    if (area)   filter.area        = { $regex: area,   $options: "i" };
     if (search) filter.description = { $regex: search, $options: "i" };
-
-    const sortMap = { newest: { createdAt: -1 }, oldest: { createdAt: 1 }, priority: { priorityScore: -1, createdAt: -1 } };
+    const sortMap  = { newest: { createdAt: -1 }, oldest: { createdAt: 1 }, priority: { priorityScore: -1, createdAt: -1 } };
     const rawLimit = parseInt(limit, 10);
-    const fetchAll = rawLimit === 0;                       // limit=0 → return everything
-    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const fetchAll = rawLimit === 0;
+    const pageNum  = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = fetchAll ? 0 : Math.min(5000, rawLimit || 50);
-    const skip = fetchAll ? 0 : (pageNum - 1) * limitNum;
-
+    const skip     = fetchAll ? 0 : (pageNum - 1) * limitNum;
     const baseQuery = Grievance.find(filter).sort(sortMap[sort] ?? sortMap.newest).select("-__v").lean();
     const [grievances, total] = await Promise.all([
       fetchAll ? baseQuery : baseQuery.skip(skip).limit(limitNum),
       Grievance.countDocuments(filter),
     ]);
-
     res.json({ success: true, data: grievances, pagination: { total, page: pageNum, limit: fetchAll ? total : limitNum, pages: fetchAll ? 1 : Math.ceil(total / limitNum), hasNext: fetchAll ? false : pageNum < Math.ceil(total / limitNum) } });
-  } catch (err) {
-    console.error("[GET /api/grievances]", err);
-    res.status(500).json({ success: false, message: "Failed to fetch grievances" });
-  }
+  } catch (err) { console.error("[GET /api/grievances]", err); res.status(500).json({ success: false, message: "Failed to fetch grievances" }); }
 });
 
 app.get("/api/grievances/stats/summary", verifyAdmin, async (req, res) => {
   try {
     const notSpam = { $match: { status: { $ne: "Spam" } } };
     const [statusStats, priorityStats, categoryStats, recentTrend, total, spam] = await Promise.all([
-      Grievance.aggregate([notSpam, { $group: { _id: "$status", count: { $sum: 1 } } }]),
+      Grievance.aggregate([notSpam, { $group: { _id: "$status",   count: { $sum: 1 } } }]),
       Grievance.aggregate([notSpam, { $group: { _id: "$priority", count: { $sum: 1 } } }]),
       Grievance.aggregate([notSpam, { $group: { _id: "$category", count: { $sum: 1 } } }, { $sort: { count: -1 } }, { $limit: 10 }]),
-      Grievance.aggregate([{ $match: { createdAt: { $gte: new Date(Date.now() - 7 * 86_400_000) }, status: { $ne: "Spam" } } }, { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } }, { $sort: { _id: 1 } }]),
+      Grievance.aggregate([{ $match: { createdAt: { $gte: new Date(Date.now() - 7*86_400_000) }, status: { $ne: "Spam" } } }, { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } }, { $sort: { _id: 1 } }]),
       Grievance.countDocuments({ status: { $ne: "Spam" } }),
       Grievance.countDocuments({ status: "Spam" }),
     ]);
-
-    const toObj = (arr) => Object.fromEntries(arr.map(({ _id, count }) => [_id, count]));
+    const toObj     = (arr) => Object.fromEntries(arr.map(({ _id, count }) => [_id, count]));
     const statusObj = toObj(statusStats);
-
-    res.json({
-      success: true,
-      data: {
-        total, spam,
-        status: statusObj,
-        priority: toObj(priorityStats),
-        categories: categoryStats.map(({ _id, count }) => ({ name: _id, count })),
-        trend: recentTrend.map(({ _id, count }) => ({ date: _id, count })),
-        resolvedPct: total ? Math.round(((statusObj.Resolved || 0) / total) * 100) : 0,
-      },
-    });
-  } catch (err) {
-    console.error("[stats/summary]", err);
-    res.status(500).json({ success: false, message: "Failed to fetch stats" });
-  }
+    res.json({ success: true, data: { total, spam, status: statusObj, priority: toObj(priorityStats), categories: categoryStats.map(({ _id, count }) => ({ name: _id, count })), trend: recentTrend.map(({ _id, count }) => ({ date: _id, count })), resolvedPct: total ? Math.round(((statusObj.Resolved || 0) / total) * 100) : 0 } });
+  } catch (err) { console.error("[stats/summary]", err); res.status(500).json({ success: false, message: "Failed to fetch stats" }); }
 });
 
 app.get("/api/grievances/:id", verifyToken, async (req, res) => {
   try {
     const grievance = await Grievance.findById(req.params.id).select("-__v").lean();
     if (!grievance) return res.status(404).json({ success: false, message: "Grievance not found" });
-    if (req.user.role === "citizen" && grievance.userEmail !== req.user.email)
-      return res.status(403).json({ success: false, message: "Access denied" });
+    if (req.user.role === "citizen" && grievance.userEmail !== req.user.email) return res.status(403).json({ success: false, message: "Access denied" });
     res.json({ success: true, data: grievance });
-  } catch {
-    res.status(500).json({ success: false, message: "Failed to fetch grievance" });
-  }
+  } catch { res.status(500).json({ success: false, message: "Failed to fetch grievance" }); }
 });
 
+// ── SUBMIT GRIEVANCE ──────────────────────────────────────────────────────────
+// ── SUBMIT GRIEVANCE ──────────────────────────────────────────────────────────
+// Replace the entire app.post("/api/grievances/submit", ...) block in index.js
+// with this code.
+//
+// KEY FIXES vs previous version:
+//   1. Native FormData — no npm form-data package
+//   2. Buffer wrapped in new Blob([buffer], { type }) — native FormData
+//      does NOT accept raw Buffer directly
+//   3. No .getHeaders() call — native fetch sets Content-Type + boundary
+//   4. No Content-Type header set manually — native fetch handles it
+//   5. Audio mimetype auto-detected — browser records audio/webm not audio/wav
+// ─────────────────────────────────────────────────────────────────────────────
 app.post(
   "/api/grievances/submit",
   verifyCitizen,
-  grievanceUpload.fields([{ name: "image", maxCount: 1 }, { name: "audio", maxCount: 1 }]),
+  grievanceUpload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "audio", maxCount: 1 },
+  ]),
   async (req, res) => {
     try {
-      const userEmail = req.user.email;
+      const userEmail   = req.user.email;
       const citizenName = req.user.name || "Anonymous";
-      const imageUrl = req.files?.image?.[0]?.path || null;
-      const audioUrl = req.files?.audio?.[0]?.path || null;
 
-      // Call AI service
+      // ── File buffers from memoryStorage ───────────────────────────────────
+      // memoryStorage gives us .buffer (raw bytes in RAM).
+      // No disk path, no Cloudinary URL yet — upload happens AFTER Flask validates.
+      const imageFile = req.files?.image?.[0] || null;
+      const audioFile = req.files?.audio?.[0] || null;
+
+      const textInput = (req.body.textInput || req.body.description || "").trim();
+
+      const hasText  = textInput.length > 0;
+      const hasImage = !!(imageFile?.buffer);
+      const hasAudio = !!(audioFile?.buffer);
+
+      if (!hasText && !hasImage && !hasAudio) {
+        return res.status(400).json({
+          success: false,
+          message: "Please provide text, image, or audio.",
+        });
+      }
+
+      // ── Build native FormData for Flask ───────────────────────────────────
+      // IMPORTANT:
+      //   - Use Node 18+ native FormData (NOT npm form-data package)
+      //   - Wrap Buffer in new Blob([buffer], { type }) before appending
+      //   - Do NOT call .getHeaders() — that method only exists on npm form-data
+      //   - Do NOT set Content-Type header — native fetch sets
+      //     "multipart/form-data; boundary=..." automatically
+      const flaskForm = new FormData();
+
+      if (hasText) {
+        flaskForm.append("text", textInput);
+      }
+
+      if (hasImage) {
+        flaskForm.append(
+          "image",
+          new Blob([imageFile.buffer], { type: imageFile.mimetype || "image/jpeg" }),
+          imageFile.originalname || "image.jpg",
+        );
+      }
+
+      if (hasAudio) {
+        // Browser MediaRecorder records audio/webm regardless of requested type.
+        // Use actual mimetype from file object, fall back to audio/webm.
+        const audioMime = audioFile.mimetype || "audio/webm";
+        const audioName = audioFile.originalname
+          || (audioMime.includes("webm") ? "audio.webm"
+            : audioMime.includes("ogg")  ? "audio.ogg"
+            : audioMime.includes("mp4")  ? "audio.mp4"
+            : "audio.wav");
+
+        flaskForm.append(
+          "audio",
+          new Blob([audioFile.buffer], { type: audioMime }),
+          audioName,
+        );
+      }
+
+      flaskForm.append("explain", "true");
+console.log(flaskForm);
+      // ── Call Flask /predict ────────────────────────────────────────────────
       let aiPrediction;
+      const timeoutMs = (hasAudio && hasImage) ? 480_000   // 8 min
+                : hasAudio               ? 420_000   // 7 min
+                : hasImage               ?  90_000   // 1.5 min
+                :                           30_000; // 30s text
       try {
         const predRes = await fetch(`${FLASK_URL}/predict`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: req.body.textInput || req.body.description || "",
-            area: req.body.area || "",
-            citizenName,
-            hasImage: !!imageUrl,
-            hasAudio: !!audioUrl,
-            explain: true,
-          }),
-          signal: AbortSignal.timeout(30_000),
+          body:   flaskForm,
+          // NO headers object — native fetch sets Content-Type + boundary automatically
+          // Adding headers here (especially Content-Type) breaks the multipart boundary
+          // In your submit route — find AbortSignal.timeout and replace with:
+
+signal: AbortSignal.timeout(timeoutMs),
         });
+
+        // Flask 403 — image-only with invalid/missing GPS
+        // Buffer already discarded — nothing uploaded to Cloudinary
+        if (predRes.status === 403) {
+          const detail = await predRes.json().catch(() => ({}));
+          return res.status(403).json({
+            success:  false,
+            message:  "Grievance rejected. Image location is outside Kakinada jurisdiction or contains no GPS data.",
+            location: "invalid",
+            detail,
+          });
+        }
 
         if (!predRes.ok) {
           const detail = await predRes.text();
-          return res.status(502).json({ success: false, message: "AI prediction service error.", detail });
+          console.error(`[Flask /predict] ${predRes.status}:`, detail);
+          return res.status(502).json({
+            success: false,
+            message: "AI prediction service error.",
+            detail,
+          });
         }
+
         aiPrediction = await predRes.json();
+
       } catch (predErr) {
-        console.error("⚠️ AI Service Error:", predErr.message);
-        return res.status(503).json({ success: false, message: "AI prediction service unavailable.", detail: predErr.message });
+        console.error("⚠️  AI Service Error:", predErr.message);
+        return res.status(503).json({
+          success: false,
+          message: "AI prediction service unavailable.",
+          detail:  predErr.message,
+        });
       }
 
-      const location = req.body.latitude && req.body.longitude
-        ? { type: "Point", coordinates: [parseFloat(req.body.longitude), parseFloat(req.body.latitude)] }
-        : undefined;
+      // ── Conditional Cloudinary upload ─────────────────────────────────────
+      // Image: upload only when Flask says location is valid,
+      //        OR when mode is text+image / audio+image (locationStatus = null,
+      //        GPS is not the primary check for those modes).
+      //        image-only with bad GPS → Flask returns 403 above, never reaches here.
+      //
+      // Audio: upload only if Whisper returned non-empty transcription.
+      //        Silent / failed transcription → audioUrl stays null.
+      //
+      // Upload failure is non-fatal — log it, save grievance with null URL.
 
+      const flaskLocationStatus = aiPrediction.location ?? null; // "valid"|"invalid"|null
+      const transcribedText     = aiPrediction.text     || "";
+
+      let imageUrl = null;
+      let audioUrl = null;
+
+      if (hasImage && (flaskLocationStatus === "valid" || flaskLocationStatus === null)) {
+        try {
+          imageUrl = await uploadToCloudinary(
+            imageFile.buffer,
+            imageFile.mimetype,
+            imageFile.originalname,
+          );
+          console.log("[submit] ✅ Image → Cloudinary:", imageUrl);
+        } catch (err) {
+          console.error("[submit] Cloudinary image upload failed:", err.message);
+        }
+      }
+
+      if (hasAudio && transcribedText.length > 0) {
+        try {
+          audioUrl = await uploadToCloudinary(
+            audioFile.buffer,
+            audioFile.mimetype,
+            audioFile.originalname,
+          );
+          console.log("[submit] ✅ Audio → Cloudinary:", audioUrl);
+        } catch (err) {
+          console.error("[submit] Cloudinary audio upload failed:", err.message);
+        }
+      }
+
+      // ── Resolve description ────────────────────────────────────────────────
+      // text mode  → citizen's typed text
+      // audio mode → Whisper transcription returned by Flask in "text" field
+      // image mode → BLIP caption returned by Flask in "text" field
+      const description = hasText
+        ? textInput
+        : (transcribedText || "Media Evidence Submitted");
+
+      const inputMode = aiPrediction.input_mode || "text";
+
+      // ── GeoJSON location ──────────────────────────────────────────────────
+      let geoLocation = undefined;
+      if (req.body.latitude && req.body.longitude) {
+        geoLocation = {
+          type:        "Point",
+          coordinates: [
+            parseFloat(req.body.longitude),
+            parseFloat(req.body.latitude),
+          ],
+        };
+      }
+
+      // ── Save to MongoDB ────────────────────────────────────────────────────
       const grievance = await Grievance.create({
         citizenName,
         userEmail,
-        area: req.body.area,
-        description: req.body.textInput || req.body.description || "Media Evidence Submitted",
-        status: "Pending",
+        area:        req.body.area,
+        description,
+        inputMode,
+        status:      "Pending",
 
-        category: aiPrediction.category ?? "Other",
+        // AI classification
+        category:           aiPrediction.category            ?? "Other",
         categoryConfidence: aiPrediction.category_confidence ?? null,
-        priority: mapUrgencyToPriority(aiPrediction.urgency),
-        urgency: aiPrediction.urgency ?? null,
-        urgencyConfidence: aiPrediction.urgency_confidence ?? null,
-        priorityScore: aiPrediction.priority_score ?? null,
-        language: aiPrediction.language ?? null,
+        priority:           mapUrgencyToPriority(aiPrediction.urgency),
+        urgency:            aiPrediction.urgency             ?? null,
+        urgencyConfidence:  aiPrediction.urgency_confidence  ?? null,
+        priorityScore:      aiPrediction.priority_score      ?? null,
+        language:           aiPrediction.language            ?? null,
 
         explanation: {
-          finalReason: aiPrediction.explanation?.final_reason ?? null,
-          prioritySummary: aiPrediction.explanation?.priority_summary ?? null,
+          finalReason:      aiPrediction.explanation?.final_reason      ?? null,
+          prioritySummary:  aiPrediction.explanation?.priority_summary  ?? null,
           categoryDecision: aiPrediction.explanation?.category_decision ?? null,
-          urgencyDecision: aiPrediction.explanation?.urgency_decision ?? null,
-          categoryTokens: sanitizeTokens(aiPrediction.explanation?.category_tokens),
-          urgencyTokens: sanitizeTokens(aiPrediction.explanation?.urgency_tokens),
+          urgencyDecision:  aiPrediction.explanation?.urgency_decision  ?? null,
+          categoryTokens:   sanitizeTokens(aiPrediction.explanation?.category_tokens),
+          urgencyTokens:    sanitizeTokens(aiPrediction.explanation?.urgency_tokens),
         },
 
-        imageUrl, audioUrl, location,
+        imageUrl,          // null if GPS invalid or Cloudinary upload failed
+        audioUrl,          // null if transcription empty or Cloudinary upload failed
+
+        location:       geoLocation,
+        locationStatus: flaskLocationStatus,  // "valid" | "invalid" | null
       });
 
-      res.status(201).json({
+      // ── Respond to client ──────────────────────────────────────────────────
+      return res.status(201).json({
         success: true,
-        data: grievance,
+        data:    grievance,
         prediction: {
-          category: aiPrediction.category,
+          category:           aiPrediction.category,
           categoryConfidence: aiPrediction.category_confidence,
-          urgency: aiPrediction.urgency,
-          urgencyConfidence: aiPrediction.urgency_confidence,
-          priorityScore: aiPrediction.priority_score,
-          language: aiPrediction.language,
+          urgency:            aiPrediction.urgency,
+          urgencyConfidence:  aiPrediction.urgency_confidence,
+          priorityScore:      aiPrediction.priority_score,
+          language:           aiPrediction.language,
+          inputMode,
+          locationStatus:     flaskLocationStatus,
+          explanation:        aiPrediction.explanation ?? null,
         },
       });
+
     } catch (err) {
       console.error("[POST /api/grievances/submit]", err);
-      res.status(500).json({ success: false, message: "Failed to submit grievance", error: err.message });
+      return res.status(500).json({
+        success: false,
+        message: "Failed to submit grievance",
+        error:   err.message,
+      });
     }
   }
 );
 
 app.put("/api/grievances/:id", verifyAdmin, async (req, res) => {
   try {
-    const ALLOWED = ["status", "adminReply", "estimatedTime", "priority", "category"];
-    const update = Object.fromEntries(Object.entries(req.body).filter(([k]) => ALLOWED.includes(k)));
+    const ALLOWED = ["status","adminReply","estimatedTime","priority","category"];
+    const update  = Object.fromEntries(Object.entries(req.body).filter(([k]) => ALLOWED.includes(k)));
     if (!Object.keys(update).length) return res.status(400).json({ success: false, message: "No valid fields to update" });
     const updated = await Grievance.findByIdAndUpdate(req.params.id, { $set: update }, { new: true, runValidators: true }).select("-__v");
     if (!updated) return res.status(404).json({ success: false, message: "Grievance not found" });
     res.json({ success: true, data: updated });
-  } catch {
-    res.status(500).json({ success: false, message: "Update failed" });
-  }
+  } catch { res.status(500).json({ success: false, message: "Update failed" }); }
 });
 
 app.delete("/api/grievances/:id", verifyAdmin, async (req, res) => {
   try {
     const deleted = await Grievance.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ success: false, message: "Grievance not found" });
-
-    // Fire-and-forget Cloudinary cleanup
-    const rmImage = deleted.imageUrl ? cloudinary.uploader.destroy(`civic_connect/images/${extractCloudinaryPublicId(deleted.imageUrl)}`).catch(() => { }) : null;
-    const rmAudio = deleted.audioUrl ? cloudinary.uploader.destroy(`civic_connect/audio/${extractCloudinaryPublicId(deleted.audioUrl)}`, { resource_type: "video" }).catch(() => { }) : null;
+    const rmImage = deleted.imageUrl ? cloudinary.uploader.destroy(`civic_connect/images/${extractCloudinaryPublicId(deleted.imageUrl)}`).catch(() => {}) : null;
+    const rmAudio = deleted.audioUrl ? cloudinary.uploader.destroy(`civic_connect/audio/${extractCloudinaryPublicId(deleted.audioUrl)}`, { resource_type: "video" }).catch(() => {}) : null;
     await Promise.allSettled([rmImage, rmAudio].filter(Boolean));
-
     res.json({ success: true, message: "Grievance permanently deleted" });
-  } catch {
-    res.status(500).json({ success: false, message: "Delete failed" });
-  }
+  } catch { res.status(500).json({ success: false, message: "Delete failed" }); }
 });
 
-// =================================================
-// 👥 ADMIN USER MANAGEMENT
-// =================================================
+// ── ADMIN USER MANAGEMENT ─────────────────────────────────────────────────────
 app.get("/api/admin/users", verifyAdmin, async (req, res) => {
   try {
     const { role, search, page = "1", limit = "30" } = req.query;
     const filter = {};
     if (role && role !== "All") filter.role = role;
     if (search) filter.$or = [{ fullName: { $regex: search, $options: "i" } }, { email: { $regex: search, $options: "i" } }];
-
-    const pageNum = Math.max(1, parseInt(page, 10));
+    const pageNum  = Math.max(1, parseInt(page, 10));
     const limitNum = Math.min(100, parseInt(limit, 10) || 30);
-
     const [users, total] = await Promise.all([
-      User.find(filter).select("-password -__v").sort({ createdAt: -1 }).skip((pageNum - 1) * limitNum).limit(limitNum).lean(),
+      User.find(filter).select("-password -__v").sort({ createdAt: -1 }).skip((pageNum-1)*limitNum).limit(limitNum).lean(),
       User.countDocuments(filter),
     ]);
-    res.json({ success: true, data: users, pagination: { total, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) } });
-  } catch {
-    res.status(500).json({ success: false, message: "Failed to fetch users" });
-  }
+    res.json({ success: true, data: users, pagination: { total, page: pageNum, limit: limitNum, pages: Math.ceil(total/limitNum) } });
+  } catch { res.status(500).json({ success: false, message: "Failed to fetch users" }); }
 });
 
 app.delete("/api/admin/users/:id", verifyAdmin, async (req, res) => {
@@ -1041,21 +1088,15 @@ app.delete("/api/admin/users/:id", verifyAdmin, async (req, res) => {
     const deleted = await User.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ success: false, message: "User not found" });
     res.json({ success: true, message: "User deleted" });
-  } catch {
-    res.status(500).json({ success: false, message: "Delete failed" });
-  }
+  } catch { res.status(500).json({ success: false, message: "Delete failed" }); }
 });
 
-// =================================================
-// 🛑 ERROR HANDLERS (must be last)
-// =================================================
+// ── ERROR HANDLERS ────────────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
   console.error("[Unhandled Error]", err);
   res.status(err.status || 500).json({ success: false, message: err.message || "Internal server error" });
 });
 app.use((_req, res) => res.status(404).json({ success: false, message: "Route not found" }));
 
-// =================================================
-// 🚀 START
-// =================================================
+// ── START ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
