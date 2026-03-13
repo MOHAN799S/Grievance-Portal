@@ -894,7 +894,7 @@ signal: AbortSignal.timeout(timeoutMs),
           const detail = await predRes.json().catch(() => ({}));
           return res.status(403).json({
             success:  false,
-            message:  "Grievance rejected. Image location is outside Kakinada jurisdiction or contains no GPS data.",
+            message:  detail.message || "Grievance rejected. Invalid location: GPS coordinates do not match the selected ward or Image location is outside Kakinada jurisdiction or contains no GPS data.",
             location: "invalid",
             detail,
           });
