@@ -795,6 +795,11 @@ app.get("/api/grievances/:id", verifyToken, async (req, res) => {
 //   4. No Content-Type header set manually — native fetch handles it
 //   5. Audio mimetype auto-detected — browser records audio/webm not audio/wav
 // ─────────────────────────────────────────────────────────────────────────────
+// ============================================================
+// EXPRESS ROUTE — POST /api/grievances/submit
+// Kakinada Municipal Corporation — CivicConnect
+// ============================================================
+
 app.post(
   "/api/grievances/submit",
   verifyCitizen,
@@ -807,7 +812,7 @@ app.post(
       const userEmail   = req.user.email;
       const citizenName = req.user.name || "Anonymous";
 
-      // ── File buffers from memoryStorage ───────────────────────────────────
+      // ── File buffers from memoryStorage ────────────────────────────────────
       const imageFile = req.files?.image?.[0] || null;
       const audioFile = req.files?.audio?.[0] || null;
 
@@ -824,15 +829,13 @@ app.post(
         });
       }
 
-      // ── Build native FormData for Flask ───────────────────────────────────
-      // - Use Node 18+ native FormData (NOT npm form-data package)
-      // - Wrap Buffer in new Blob([buffer], { type }) before appending
-      // - Do NOT set Content-Type header — native fetch sets boundary automatically
+      // ── Build native FormData for Flask ────────────────────────────────────
+      // - Node 18+ native FormData (NOT npm form-data package)
+      // - Wrap Buffer in Blob before appending
+      // - Do NOT set Content-Type header — fetch sets boundary automatically
       const flaskForm = new FormData();
 
-      if (hasText) {
-        flaskForm.append("text", textInput);
-      }
+      if (hasText) flaskForm.append("text", textInput);
 
       if (hasImage) {
         flaskForm.append(
@@ -849,7 +852,6 @@ app.post(
             : audioMime.includes("ogg")  ? "audio.ogg"
             : audioMime.includes("mp4")  ? "audio.mp4"
             : "audio.wav");
-
         flaskForm.append(
           "audio",
           new Blob([audioFile.buffer], { type: audioMime }),
@@ -867,12 +869,14 @@ app.post(
       if (req.body.longitude) flaskForm.append("longitude", req.body.longitude);
       if (req.body.area)      flaskForm.append("area",      req.body.area);
 
+      // ── Dynamic timeout per input mode ─────────────────────────────────────
+      const timeoutMs = (hasAudio && hasImage) ? 480_000   // 8 min  — audio+image
+                      : hasAudio               ? 420_000   // 7 min  — audio only
+                      : hasImage               ?  90_000   // 1.5 min — image only
+                      :                           30_000;  // 30s    — text only
+
       // ── Call Flask /predict ────────────────────────────────────────────────
       let aiPrediction;
-      const timeoutMs = (hasAudio && hasImage) ? 480_000   // 8 min
-                      : hasAudio               ? 420_000   // 7 min
-                      : hasImage               ?  90_000   // 1.5 min
-                      :                           30_000;  // 30s text
       try {
         const predRes = await fetch(`${FLASK_URL}/predict`, {
           method: "POST",
@@ -880,24 +884,59 @@ app.post(
           signal: AbortSignal.timeout(timeoutMs),
         });
 
-        // Flask 403 — location invalid or ward mismatch
-        // Nothing has been uploaded to Cloudinary yet — safe to reject here.
+        // ── Flask 403 — location invalid / ward mismatch ──────────────────────
+        // Nothing has been uploaded to Cloudinary yet — safe to reject cleanly.
         if (predRes.status === 403) {
           const detail = await predRes.json().catch(() => ({}));
           return res.status(403).json({
             success:  false,
-            message:  detail.message || "Grievance rejected. Invalid location: GPS coordinates do not match the selected ward or image is outside Kakinada jurisdiction.",
+            message:  detail.message || "Grievance rejected. GPS coordinates do not match the selected ward or image is outside Kakinada jurisdiction.",
             location: "invalid",
             detail,
           });
         }
 
+        // ── All other non-2xx Flask responses ─────────────────────────────────
+        // FIX: always parse as JSON — Flask always returns structured error bodies.
+        // The previous code used predRes.text() which returns a plain STRING.
+        // Then detail?.response?.data?.message on a string is always undefined,
+        // so the error message was always swallowed and "AI prediction service error."
+        // was shown regardless of what Flask actually said (e.g. "too_short" 422).
         if (!predRes.ok) {
-          const detail = await predRes.text();
+          const detail = await predRes.json().catch(async () => {
+            // If Flask somehow returned non-JSON (e.g. 502 from HF proxy), degrade gracefully
+            const raw = await predRes.text().catch(() => "");
+            return { message: raw || "Unknown Flask error", code: "parse_error" };
+          });
+
           console.error(`[Flask /predict] ${predRes.status}:`, detail);
+
+          // Flask 422 — input validation failed (too_short, junk_input, small_talk, etc.)
+          // Forward Flask's exact message so the citizen knows exactly what to fix.
+          if (predRes.status === 422) {
+            return res.status(422).json({
+              success: false,
+              message: detail.message || "Input validation failed. Please check your text.",
+              code:    detail.code    || "validation_error",
+              detail,
+            });
+          }
+
+          // Flask 400 — missing input fields
+          if (predRes.status === 400) {
+            return res.status(400).json({
+              success: false,
+              message: detail.message || "Please provide at least one of: text, audio, or image.",
+              code:    detail.code    || "missing_input",
+              detail,
+            });
+          }
+
+          // Flask 500 or anything else — still forward Flask's message, never swallow it
           return res.status(502).json({
             success: false,
-            message:detail.message || "AI prediction service error.",
+            message: detail.message || "AI prediction service error.",
+            code:    detail.code    || "flask_error",
             detail,
           });
         }
@@ -905,27 +944,31 @@ app.post(
         aiPrediction = await predRes.json();
 
       } catch (predErr) {
+        // Network failure, DNS error, or AbortSignal timeout
+        const isTimeout = predErr.name === "TimeoutError" || predErr.name === "AbortError";
         console.error("⚠️  AI Service Error:", predErr.message);
         return res.status(503).json({
           success: false,
-          message: predErr.message || "AI prediction service unavailable.",
-          detail:  predErr.message,
+          message: isTimeout
+            ? "AI service timed out. For audio submissions, please try a shorter recording."
+            : predErr.message || "AI prediction service unavailable.",
+          code:   isTimeout ? "timeout" : "service_unavailable",
+          detail: predErr.message,
         });
       }
 
-      // ── Extract all Flask response fields ─────────────────────────────────
+      // ── Extract all Flask response fields ──────────────────────────────────
       const flaskLocationStatus = aiPrediction.location          ?? null;  // "valid"|"invalid"|null
       const transcribedText     = aiPrediction.text              || "";
 
-      // ── Evidence relevance (soft flag from Flask civic image scorer) ───────
+      // ── Evidence relevance (soft flag from Flask civic image scorer) ────────
       // evidence_relevant = true   → image is valid civic evidence
-      // evidence_relevant = false  → image is irrelevant/non-civic (flagged only, NOT rejected)
-      // evidence_relevant = null   → no image was submitted
-      const evidenceRelevant    = aiPrediction.evidence_relevant ?? null;   // bool | null
-      const evidenceNote        = aiPrediction.evidence_note     ?? null;   // string | null
-      const civicScore          = aiPrediction.civic_score       ?? null;   // int | null
+      // evidence_relevant = false  → image irrelevant/non-civic (flagged, NOT rejected)
+      // evidence_relevant = null   → no image submitted
+      const evidenceRelevant = aiPrediction.evidence_relevant ?? null;  // bool | null
+      const evidenceNote     = aiPrediction.evidence_note     ?? null;  // string | null
+      const civicScore       = aiPrediction.civic_score       ?? null;  // int | null
 
-      // Log evidence relevance for monitoring
       if (evidenceRelevant !== null) {
         console.log(
           `[submit] Evidence relevance: relevant=${evidenceRelevant} ` +
@@ -933,14 +976,14 @@ app.post(
         );
       }
 
-      // ── Conditional Cloudinary upload ─────────────────────────────────────
+      // ── Conditional Cloudinary upload ──────────────────────────────────────
       // Image:
-      //   - text+image / audio+image (location=null) → always upload
-      //   - image-only with valid location            → upload
-      //   - image-only with invalid GPS               → Flask returns 403 above, never here
-      //   - non-civic image (evidence_relevant=false) → still upload (soft flag only)
+      //   text+image / audio+image (location=null) → always upload
+      //   image-only with valid location            → upload
+      //   image-only with invalid GPS               → Flask returns 403 above, never reaches here
+      //   non-civic image (evidence_relevant=false) → still upload (soft flag only)
       //
-      // Audio: upload only if Whisper returned non-empty transcription.
+      // Audio: upload only if Whisper returned a non-empty transcription.
       // Upload failure is non-fatal — log and continue with null URL.
 
       let imageUrl = null;
@@ -1025,14 +1068,13 @@ app.post(
         audioUrl,
 
         location:       geoLocation,
-        locationStatus: flaskLocationStatus,   // "valid" | "invalid" | null
+        locationStatus: flaskLocationStatus,  // "valid" | "invalid" | null
 
-        // ── Evidence relevance fields ──────────────────────────────────────
-        // Stored so admins can filter/flag grievances with unverified evidence.
+        // Evidence relevance fields — stored for admin filtering/flagging.
         // evidenceRelevant=false means image was non-civic but grievance was accepted.
-        evidenceRelevant,   // bool | null
-        evidenceNote,       // string | null — reason for flag
-        civicScore,         // int | null — weighted lexicon match score
+        evidenceRelevant,  // bool | null
+        evidenceNote,      // string | null — reason for flag
+        civicScore,        // int | null — weighted lexicon match score
       });
 
       // ── Respond to client ──────────────────────────────────────────────────
@@ -1045,14 +1087,14 @@ app.post(
           urgency:            aiPrediction.urgency,
           urgencyConfidence:  aiPrediction.urgency_confidence,
           priorityScore:      aiPrediction.priority_score,
+          priorityBand:       aiPrediction.priority_band      ?? null,
           language:           aiPrediction.language,
           inputMode,
           locationStatus:     flaskLocationStatus,
-          explanation:        aiPrediction.explanation ?? null,
+          explanation:        aiPrediction.explanation        ?? null,
 
-          // ── Evidence relevance — forwarded to frontend for UI display ──────
-          // Frontend can show a warning badge like:
-          // "⚠️ Evidence image may not match reported issue"
+          // Evidence relevance — forwarded to frontend for UI badge display.
+          // Frontend shows: "Civic Evidence Verified" or "Image Evidence Unverified"
           evidenceRelevant,
           evidenceNote,
           civicScore,
@@ -1069,7 +1111,6 @@ app.post(
     }
   }
 );
-
 app.put("/api/grievances/:id", verifyAdmin, async (req, res) => {
   try {
     const ALLOWED = ["status","adminReply","estimatedTime","priority","category"];

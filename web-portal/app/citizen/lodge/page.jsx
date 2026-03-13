@@ -690,7 +690,7 @@ export default function SmartLodge() {
         signal:      AbortSignal.timeout(timeoutMs),
       });
 
-      if (res.status === 403) {
+      if (res.status === 403 || res.status === 422 || res.status === 400) {
         const json = await res.json().catch(() => ({}));
         throw new Error(json.message || "Image location is outside Kakinada jurisdiction or contains no GPS data.");
       }
