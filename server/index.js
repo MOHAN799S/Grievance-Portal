@@ -865,11 +865,11 @@ app.post(
       }
 
       flaskForm.append("explain", "true");
-      flaskForm.append("explain", "true");
 
 // ✅ Forward GPS coordinates so Flask can validate location when EXIF is absent
 if (req.body.latitude)  flaskForm.append("latitude",  req.body.latitude);
 if (req.body.longitude) flaskForm.append("longitude", req.body.longitude);
+if(req.body.area)      flaskForm.append("area",      req.body.area);
 console.log(flaskForm);
       // ── Call Flask /predict ────────────────────────────────────────────────
       let aiPrediction;
