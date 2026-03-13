@@ -20,7 +20,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "civic_jwt_secret_change_in_prod";
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "civic_refresh_secret_change_in_prod";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || "30d";
-const FLASK_URL = process.env.FLASK_URL || "http://localhost:5001";
+const FLASK_URL = process.env.FLASK_URL || "http://localhost:7860";
 const PORT = process.env.PORT || 5000;
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
 
@@ -45,7 +45,7 @@ const FLASK_VALID_AREAS = new Set([
   "gudari gunta","indrapalem","sarpavaram","uppada","kaikavolu",
   "kothuru","thammavaram","thimmapuram","vivekananda street","jr ntr road",
   "jntu kakinada area","govt general hospital area","apsp camp",
-  "kakinada beach road","kakinada bazar","anjaneya nagar",
+  "kakinada beach road","kakinada bazar","anjaneya nagar","kothapalli","surampalem"
 ]);
 const FLASK_VALID_CATEGORIES = new Set([
   "electricity","garbage","pollution","public transport",
@@ -865,6 +865,11 @@ app.post(
       }
 
       flaskForm.append("explain", "true");
+      flaskForm.append("explain", "true");
+
+// ✅ Forward GPS coordinates so Flask can validate location when EXIF is absent
+if (req.body.latitude)  flaskForm.append("latitude",  req.body.latitude);
+if (req.body.longitude) flaskForm.append("longitude", req.body.longitude);
 console.log(flaskForm);
       // ── Call Flask /predict ────────────────────────────────────────────────
       let aiPrediction;

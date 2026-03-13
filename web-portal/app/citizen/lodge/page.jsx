@@ -34,7 +34,7 @@ const LOCATIONS = [
   "Ramanayyapeta","Rama Rao Peta","Kondayya Palem","Ganganapalle","Gudari Gunta","Indrapalem",
   "Sarpavaram","Uppada","Kaikavolu","Kothuru","Thammavaram","Thimmapuram",
   "Vivekananda Street","JR NTR Road","JNTU Kakinada Area","Govt General Hospital Area","APSP Camp",
-  "Kakinada Beach Road","Kakinada Bazar","Anjaneya Nagar",
+  "Kakinada Beach Road","Kakinada Bazar","Anjaneya Nagar","kothapalli","surampalem"
 ];
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
@@ -65,7 +65,7 @@ const SUBMISSION_STAGES = {
 const MODE_TIMING = {
   "text": {
     badge:    "⚡ Fast",
-    estimate: "~10–20 seconds",
+    estimate: "~10–30 seconds",
     color:    "text-green-700",
     bg:       "bg-green-50",
     border:   "border-green-200",
