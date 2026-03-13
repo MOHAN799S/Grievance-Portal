@@ -145,24 +145,32 @@ function AIRow({ label, value }) {
   );
 }
 
-// ── Evidence Relevance Badge (shown in SuccessScreen & inline) ─────────────
+// ── Evidence Relevance Badge ───────────────────────────────────────────────
 // evidence_relevant: true  → green "Civic Evidence Verified"
 // evidence_relevant: false → amber warning with note
 // evidence_relevant: null  → nothing (no image submitted)
+//
+// NOTE: BLIP scores the image visually; BERT classifies the complaint text.
+// They legitimately differ (e.g. garbage image + sanitation complaint = valid).
+// The badge reflects BLIP's visual check only — not the BERT category.
 function EvidenceRelevanceBadge({ evidenceRelevant, evidenceNote, civicScore }) {
   if (evidenceRelevant === null || evidenceRelevant === undefined) return null;
 
   if (evidenceRelevant === true) {
+    // Strip the internal BLIP/BERT explanation from the note shown to citizens
+    const citizenNote = evidenceNote
+      ? evidenceNote.replace(/\s*Note: BLIP scores.*$/i, "").trim()
+      : null;
     return (
       <div className="flex items-start gap-3 p-3 rounded-xl bg-green-50 border border-green-200">
         <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
         <div className="flex-1">
           <p className="text-xs font-bold text-green-800">Civic Evidence Verified</p>
-          {evidenceNote && (
-            <p className="text-xs text-green-700 mt-0.5 leading-snug">{evidenceNote}</p>
+          {citizenNote && (
+            <p className="text-xs text-green-700 mt-0.5 leading-snug">{citizenNote}</p>
           )}
           {civicScore != null && (
-            <p className="text-xs text-green-600 font-mono mt-1">Relevance score: {civicScore}</p>
+            <p className="text-xs text-green-600 font-mono mt-1">Visual relevance score: {civicScore}</p>
           )}
         </div>
       </div>
@@ -176,10 +184,10 @@ function EvidenceRelevanceBadge({ evidenceRelevant, evidenceNote, civicScore }) 
       <div className="flex-1">
         <p className="text-xs font-bold text-amber-800">Image Evidence Unverified</p>
         <p className="text-xs text-amber-700 mt-0.5 leading-snug">
-          {evidenceNote || "The submitted image does not appear to show a civic issue. Your grievance has been accepted, but the image may not be reviewed as evidence."}
+          {evidenceNote || "The submitted image does not appear to show a civic issue. Your grievance has been accepted, but the image may not be reviewed as supporting evidence."}
         </p>
         {civicScore != null && (
-          <p className="text-xs text-amber-600 font-mono mt-1">Relevance score: {civicScore} (threshold: 2)</p>
+          <p className="text-xs text-amber-600 font-mono mt-1">Visual relevance score: {civicScore} (minimum required: 2)</p>
         )}
       </div>
     </div>
@@ -925,7 +933,7 @@ export default function SmartLodge() {
           )}
 
           <p className="text-center text-xs text-slate-400 font-medium">
-            Reviewed within 24 hours · 
+            Reviewed within 24 hours · Helpline: 1800-599-4116
           </p>
         </div>
       </div>
