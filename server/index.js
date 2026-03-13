@@ -897,7 +897,7 @@ app.post(
           console.error(`[Flask /predict] ${predRes.status}:`, detail);
           return res.status(502).json({
             success: false,
-            message:detail || "AI prediction service error.",
+            message:detail.message || "AI prediction service error.",
             detail,
           });
         }
