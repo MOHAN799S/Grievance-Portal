@@ -2,30 +2,13 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
-  Mic,
-  Type,
-  Send,
-  Loader2,
-  CheckCircle2,
-  Play,
-  Trash2,
-  History,
-  Camera,
-  RefreshCw,
-  X,
-  Shield,
-  User,
-  Navigation,
-  AlertCircle,
-  Upload,
-  Zap,
-  Ban,
-  Clock,
+  ArrowLeft, Mic, Type, Send, Loader2, CheckCircle2, Play, Trash2,
+  History, Camera, RefreshCw, X, Shield, User, Navigation, AlertCircle,
+  Upload, Zap, Ban, Clock, ImageOff, ImageCheck, Info,
 } from "lucide-react";
 import Link from "next/link";
 
-// ── Kakinada Municipal Corporation — official wards & localities ONLY ────────
+// ── Kakinada Municipal Corporation — official wards & localities ONLY ──────
 const LOCATIONS = [
   "Suryaraopeta","Jagannaickpur","Raja Rao Peta","Bhanugudi","Old Town","Rajah Street","Main Road",
   "Gandhi Nagar","Ashok Nagar","Nethaji Nagar","Srinivasa Nagar","TNGO Colony","Shankar Vilas","Collector's Colony",
@@ -34,23 +17,19 @@ const LOCATIONS = [
   "Ramanayyapeta","Rama Rao Peta","Kondayya Palem","Ganganapalle","Gudari Gunta","Indrapalem",
   "Sarpavaram","Uppada","Kaikavolu","Kothuru","Thammavaram","Thimmapuram",
   "Vivekananda Street","JR NTR Road","JNTU Kakinada Area","Govt General Hospital Area","APSP Camp",
-  "Kakinada Beach Road","Kakinada Bazar","Anjaneya Nagar","kothapalli","surampalem"
+  "Kakinada Beach Road","Kakinada Bazar","Anjaneya Nagar","kothapalli","surampalem",
 ];
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-// ── Timeout per input mode (ms) ───────────────────────────────────────────────
-// audio+image needs up to 3 Whisper attempts (~3 min) + BLIP (~1 min) = 4 min
-// Keep frontend timeout slightly above Express timeout
 const MODE_TIMEOUT_MS = {
   "text":        35_000,
   "image":       90_000,
-  "audio":       450_000,  // 7.5 min
+  "audio":       450_000,
   "text+image":  60_000,
-  "audio+image": 510_000,  // 8.5 min
+  "audio+image": 510_000,
 };
 
-// ── Submission Flow States ────────────────────────────────────────────────────
 const SUBMISSION_STAGES = {
   IDLE:          "idle",
   VALIDATING:    "validating",
@@ -61,61 +40,44 @@ const SUBMISSION_STAGES = {
   ERROR:         "error",
 };
 
-// ── Timing config per mode ────────────────────────────────────────────────────
 const MODE_TIMING = {
   "text": {
-    badge:    "⚡ Fast",
-    estimate: "~10–30 seconds",
-    color:    "text-green-700",
-    bg:       "bg-green-50",
-    border:   "border-green-200",
-    overlay:  "Classifying your grievance — almost done…",
-    hint:     "Text-only is the fastest mode. AI reads and classifies in seconds.",
-    warn:     null,
+    badge: "⚡ Fast", estimate: "~10–30 seconds",
+    color: "text-green-700", bg: "bg-green-50", border: "border-green-200",
+    overlay: "Classifying your grievance — almost done…",
+    hint: "Text-only is the fastest mode. AI reads and classifies in seconds.",
+    warn: null,
   },
   "image": {
-    badge:    "🖼️ Moderate",
-    estimate: "~30–60 seconds",
-    color:    "text-amber-700",
-    bg:       "bg-amber-50",
-    border:   "border-amber-200",
-    overlay:  "BLIP + EasyOCR are scanning your image for civic content…",
-    hint:     "Image scanning (BLIP + OCR) takes around 30–60 seconds.",
-    warn:     null,
+    badge: "🖼️ Moderate", estimate: "~30–60 seconds",
+    color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200",
+    overlay: "BLIP + EasyOCR are scanning your image for civic content…",
+    hint: "Image scanning (BLIP + OCR) takes around 30–60 seconds.",
+    warn: null,
   },
   "audio": {
-    badge:    "🎤 Slow",
-    estimate: "~2–4 minutes",
-    color:    "text-orange-700",
-    bg:       "bg-orange-50",
-    border:   "border-orange-200",
-    overlay:  "Whisper AI is transcribing your voice in Telugu / Hindi / English…",
-    hint:     "Whisper tries EN → TE → HI until it finds a clean transcription.",
-    warn:     "⚠️ Do not close or refresh this tab while voice is being processed.",
+    badge: "🎤 Slow", estimate: "~2–4 minutes",
+    color: "text-orange-700", bg: "bg-orange-50", border: "border-orange-200",
+    overlay: "Whisper AI is transcribing your voice in Telugu / Hindi / English…",
+    hint: "Whisper tries EN → TE → HI until it finds a clean transcription.",
+    warn: "⚠️ Do not close or refresh this tab while voice is being processed.",
   },
   "text+image": {
-    badge:    "🖼️ Moderate",
-    estimate: "~20–40 seconds",
-    color:    "text-amber-700",
-    bg:       "bg-amber-50",
-    border:   "border-amber-200",
-    overlay:  "Verifying image GPS location and classifying your text…",
-    hint:     "Text is instant. Image GPS verification adds ~20–40 seconds.",
-    warn:     null,
+    badge: "🖼️ Moderate", estimate: "~20–40 seconds",
+    color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200",
+    overlay: "Verifying image GPS location and classifying your text…",
+    hint: "Text is instant. Image GPS verification adds ~20–40 seconds.",
+    warn: null,
   },
   "audio+image": {
-    badge:    "⏳ Slowest",
-    estimate: "~3–5 minutes",
-    color:    "text-red-700",
-    bg:       "bg-red-50",
-    border:   "border-red-200",
-    overlay:  "Running Whisper transcription + BLIP image scan simultaneously…",
-    hint:     "Both Whisper (voice) and BLIP (image) run together — expect 3–5 min on CPU.",
-    warn:     "⚠️ This is the slowest mode. Keep this tab open — do not refresh.",
+    badge: "⏳ Slowest", estimate: "~3–5 minutes",
+    color: "text-red-700", bg: "bg-red-50", border: "border-red-200",
+    overlay: "Running Whisper transcription + BLIP image scan simultaneously…",
+    hint: "Both Whisper (voice) and BLIP (image) run together — expect 3–5 min on CPU.",
+    warn: "⚠️ This is the slowest mode. Keep this tab open — do not refresh.",
   },
 };
 
-// ── Valid input combinations ──────────────────────────────────────────────────
 function resolveInputMode(hasText, hasAudio, hasImage) {
   if (!hasText && !hasAudio && !hasImage)
     return { valid: false, mode: null, conflictError: null };
@@ -140,7 +102,7 @@ const MODE_META = {
   "audio+image": { label: "Audio + Evidence", desc: "Audio is the grievance. Image is location evidence." },
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────
 function FieldNote({ text }) {
   return <p className="text-xs text-slate-500 font-medium mt-2.5">💡 {text}</p>;
 }
@@ -153,7 +115,7 @@ function TimingNote({ mode }) {
       <div className="flex items-center gap-2">
         <Clock className={`w-3.5 h-3.5 flex-shrink-0 ${t.color}`} />
         <p className={`text-xs font-bold ${t.color}`}>
-          {t.badge} &nbsp;·&nbsp; Expected time: <span className="underline decoration-dotted">{t.estimate}</span>
+          {t.badge}&nbsp;·&nbsp;Expected time: <span className="underline decoration-dotted">{t.estimate}</span>
         </p>
       </div>
       <p className={`text-xs leading-snug pl-5 ${t.color} opacity-90`}>{t.hint}</p>
@@ -183,7 +145,47 @@ function AIRow({ label, value }) {
   );
 }
 
-// ── Elapsed Timer — live seconds counter shown in overlay ─────────────────────
+// ── Evidence Relevance Badge (shown in SuccessScreen & inline) ─────────────
+// evidence_relevant: true  → green "Civic Evidence Verified"
+// evidence_relevant: false → amber warning with note
+// evidence_relevant: null  → nothing (no image submitted)
+function EvidenceRelevanceBadge({ evidenceRelevant, evidenceNote, civicScore }) {
+  if (evidenceRelevant === null || evidenceRelevant === undefined) return null;
+
+  if (evidenceRelevant === true) {
+    return (
+      <div className="flex items-start gap-3 p-3 rounded-xl bg-green-50 border border-green-200">
+        <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+        <div className="flex-1">
+          <p className="text-xs font-bold text-green-800">Civic Evidence Verified</p>
+          {evidenceNote && (
+            <p className="text-xs text-green-700 mt-0.5 leading-snug">{evidenceNote}</p>
+          )}
+          {civicScore != null && (
+            <p className="text-xs text-green-600 font-mono mt-1">Relevance score: {civicScore}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // false — soft flag, grievance still accepted
+  return (
+    <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-50 border border-amber-200">
+      <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+      <div className="flex-1">
+        <p className="text-xs font-bold text-amber-800">Image Evidence Unverified</p>
+        <p className="text-xs text-amber-700 mt-0.5 leading-snug">
+          {evidenceNote || "The submitted image does not appear to show a civic issue. Your grievance has been accepted, but the image may not be reviewed as evidence."}
+        </p>
+        {civicScore != null && (
+          <p className="text-xs text-amber-600 font-mono mt-1">Relevance score: {civicScore} (threshold: 2)</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ElapsedTimer({ running }) {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -201,7 +203,6 @@ function ElapsedTimer({ running }) {
   );
 }
 
-// ── Input Mode Indicator ──────────────────────────────────────────────────────
 function InputModeIndicator({ hasText, hasAudio, hasImage }) {
   const { mode, conflictError } = resolveInputMode(hasText, hasAudio, hasImage);
   if (!hasText && !hasAudio && !hasImage) return null;
@@ -228,10 +229,10 @@ function InputModeIndicator({ hasText, hasAudio, hasImage }) {
   else if (mode === "image")  rows.push({ dot: "bg-blue-500",  label: "Image", role: "Grievance Description → text will be extracted" });
   else if (mode === "text+image") {
     rows.push({ dot: "bg-blue-500",  label: "Text",  role: "Grievance Description" });
-    rows.push({ dot: "bg-amber-500", label: "Image", role: "Supporting Evidence (location verified via EXIF)" });
+    rows.push({ dot: "bg-amber-500", label: "Image", role: "Supporting Evidence (location + civic content verified)" });
   } else if (mode === "audio+image") {
     rows.push({ dot: "bg-blue-500",  label: "Audio", role: "Grievance Description → will be transcribed" });
-    rows.push({ dot: "bg-amber-500", label: "Image", role: "Supporting Evidence (location verified via EXIF)" });
+    rows.push({ dot: "bg-amber-500", label: "Image", role: "Supporting Evidence (location + civic content verified)" });
   }
 
   return (
@@ -271,11 +272,20 @@ function InputModeIndicator({ hasText, hasAudio, hasImage }) {
           {timing.warn && <p className={`text-xs font-semibold leading-snug pl-5 ${timing.color}`}>{timing.warn}</p>}
         </div>
       )}
+      {/* Evidence note for image-evidence modes */}
+      {(mode === "text+image" || mode === "audio+image") && (
+        <div className="flex items-start gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl">
+          <Info className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-blue-700 leading-snug">
+            Your evidence image will be checked for civic content relevance (BLIP AI).
+            Irrelevant images are soft-flagged but your grievance is always accepted.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Submission Flow Indicator ─────────────────────────────────────────────────
 function SubmissionFlowIndicator({ stage, inputMode }) {
   const stageDesc = {
     [SUBMISSION_STAGES.VALIDATING]:    "Checking your inputs and session token…",
@@ -315,18 +325,12 @@ function SubmissionFlowIndicator({ stage, inputMode }) {
               <p className={`text-sm font-bold leading-none ${
                 isActive ? "text-blue-700" : isComplete ? "text-green-700" : "text-slate-400"
               }`}>{s.label}</p>
-              {isActive && (
-                <p className="text-xs text-slate-500 mt-1 leading-snug">{stageDesc[s.key]}</p>
-              )}
+              {isActive && <p className="text-xs text-slate-500 mt-1 leading-snug">{stageDesc[s.key]}</p>}
             </div>
           </div>
         );
       })}
-
-      {/* Live elapsed timer — only shown during AI processing stages */}
       <ElapsedTimer running={isProcessing} />
-
-      {/* Timing hint box */}
       {timing && (
         <div className={`rounded-xl border px-4 py-3 ${timing.bg} ${timing.border}`}>
           <div className="flex items-start gap-2">
@@ -343,7 +347,6 @@ function SubmissionFlowIndicator({ stage, inputMode }) {
   );
 }
 
-// ── Error Banner ──────────────────────────────────────────────────────────────
 function ErrorBanner({ error, onDismiss }) {
   return (
     <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex items-start gap-3">
@@ -359,11 +362,22 @@ function ErrorBanner({ error, onDismiss }) {
   );
 }
 
-// ── Success Screen ────────────────────────────────────────────────────────────
+// ── Success Screen ──────────────────────────────────────────────────────────
+// prediction shape (from Express → Flask):
+//   category, urgency, language, categoryConfidence, urgencyConfidence,
+//   priorityScore, priorityBand, locationStatus,
+//   evidenceRelevant, evidenceNote, civicScore,   ← NEW fields
+//   explanation: { finalReason, … }
 function SuccessScreen({ successData, prediction, onReset }) {
+  const hasImage = prediction?.inputMode === "image"
+    || prediction?.inputMode === "text+image"
+    || prediction?.inputMode === "audio+image";
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
+
+        {/* Header */}
         <div className="bg-white rounded-3xl border border-green-200 shadow-xl p-8 text-center mb-6">
           <div className="flex justify-center mb-4">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center animate-pulse">
@@ -373,6 +387,8 @@ function SuccessScreen({ successData, prediction, onReset }) {
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Grievance Registered</h1>
           <p className="text-slate-600 text-base">Your complaint has been submitted and is being reviewed.</p>
         </div>
+
+        {/* Reference ID */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-lg p-6 mb-6 text-center">
           <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">Reference ID</p>
           <p className="text-2xl font-mono font-bold text-blue-600 mb-3">
@@ -380,20 +396,30 @@ function SuccessScreen({ successData, prediction, onReset }) {
           </p>
           <p className="text-sm text-slate-600">Save this ID to track your grievance status</p>
         </div>
+
+        {/* Grievance Details */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-lg p-6 mb-6">
           <h3 className="font-bold text-slate-900 mb-4">Grievance Details</h3>
           <div className="space-y-3">
-            <AIRow label="Area/Ward"  value={successData.area} />
-            <AIRow label="Status"     value={successData.status} />
-            <AIRow label="Input Mode" value={successData.inputMode ?? "—"} />
+            <AIRow label="Area / Ward"  value={successData.area} />
+            <AIRow label="Status"       value={successData.status} />
+            <AIRow label="Input Mode"   value={successData.inputMode ?? prediction?.inputMode ?? "—"} />
             {prediction?.category && <AIRow label="Category" value={prediction.category} />}
             {prediction?.urgency  && <AIRow label="Urgency"  value={prediction.urgency}  />}
+
+            {/* Location validation row */}
             {prediction?.locationStatus && (
               <div className={`p-3 rounded-lg border flex items-center gap-2 ${
-                prediction.locationStatus === "valid" ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"
+                prediction.locationStatus === "valid"
+                  ? "bg-green-50 border-green-200"
+                  : "bg-amber-50 border-amber-200"
               }`}>
-                <div className={`w-2 h-2 rounded-full ${prediction.locationStatus === "valid" ? "bg-green-500" : "bg-amber-500"}`} />
-                <p className={`text-xs font-bold ${prediction.locationStatus === "valid" ? "text-green-700" : "text-amber-700"}`}>
+                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                  prediction.locationStatus === "valid" ? "bg-green-500" : "bg-amber-500"
+                }`} />
+                <p className={`text-xs font-bold ${
+                  prediction.locationStatus === "valid" ? "text-green-700" : "text-amber-700"
+                }`}>
                   Evidence Location:{" "}
                   {prediction.locationStatus === "valid"
                     ? "Verified — inside Kakinada jurisdiction"
@@ -401,18 +427,43 @@ function SuccessScreen({ successData, prediction, onReset }) {
                 </p>
               </div>
             )}
+
+            {/* ── Evidence Relevance Badge ────────────────────────────────
+                Only shown when an image was part of the submission.
+                Soft-flag: irrelevant image doesn't block success screen.
+            ──────────────────────────────────────────────────────────── */}
+            {hasImage && (
+              <EvidenceRelevanceBadge
+                evidenceRelevant={prediction?.evidenceRelevant}
+                evidenceNote={prediction?.evidenceNote}
+                civicScore={prediction?.civicScore}
+              />
+            )}
           </div>
         </div>
+
+        {/* AI Assessment */}
         {prediction && (
           <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-3xl border border-purple-200 shadow-lg p-6 mb-6">
             <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
               <Zap className="w-5 h-5 text-purple-600" />AI Assessment
             </h3>
             <div className="space-y-3">
-              {prediction.categoryConfidence != null && <AIRow label="Category Confidence" value={`${Math.round(prediction.categoryConfidence * 100)}%`} />}
-              {prediction.urgencyConfidence  != null && <AIRow label="Urgency Confidence"  value={`${Math.round(prediction.urgencyConfidence  * 100)}%`} />}
-              {prediction.priorityScore      != null && <AIRow label="Priority Score"      value={`${Math.round(prediction.priorityScore      * 100)}%`} />}
-              {prediction.language && <AIRow label="Detected Language" value={prediction.language} />}
+              {prediction.categoryConfidence != null && (
+                <AIRow label="Category Confidence" value={`${Math.round(prediction.categoryConfidence * 100)}%`} />
+              )}
+              {prediction.urgencyConfidence != null && (
+                <AIRow label="Urgency Confidence" value={`${Math.round(prediction.urgencyConfidence * 100)}%`} />
+              )}
+              {prediction.priorityScore != null && (
+                <AIRow label="Priority Score" value={`${Math.round(prediction.priorityScore * 100)}%`} />
+              )}
+              {prediction.priorityBand && (
+                <AIRow label="Priority Band" value={prediction.priorityBand} />
+              )}
+              {prediction.language && (
+                <AIRow label="Detected Language" value={prediction.language} />
+              )}
             </div>
             {prediction.explanation?.finalReason && (
               <div className="mt-4 p-4 bg-white rounded-lg border border-slate-200">
@@ -422,6 +473,8 @@ function SuccessScreen({ successData, prediction, onReset }) {
             )}
           </div>
         )}
+
+        {/* Actions */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <button onClick={onReset} className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-sm transition-all hover:shadow-lg shadow-md">
             Lodge Another Complaint
@@ -430,6 +483,7 @@ function SuccessScreen({ successData, prediction, onReset }) {
             View Dashboard
           </Link>
         </div>
+
         <div className="text-center mt-6 pt-6 border-t border-slate-200">
           <p className="text-xs text-slate-500">Reviewed within 24 hours · Helpline: 1800-599-4116</p>
           <p className="text-xs text-slate-400 mt-1">Government of Andhra Pradesh — East Godavari District</p>
@@ -439,7 +493,7 @@ function SuccessScreen({ successData, prediction, onReset }) {
   );
 }
 
-// ── Auth Gate ─────────────────────────────────────────────────────────────────
+// ── Auth Gate ──────────────────────────────────────────────────────────────
 function AuthGate() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-50 flex items-center justify-center p-4">
@@ -462,7 +516,7 @@ function AuthGate() {
   );
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// ── Main Component ─────────────────────────────────────────────────────────
 export default function SmartLodge() {
   const router = useRouter();
 
@@ -513,8 +567,7 @@ export default function SmartLodge() {
 
   const handleFetchAddress = () => {
     if (!navigator.geolocation) { setErrorMessage("Geolocation not supported."); return; }
-    setFetchingAddr(true);
-    setErrorMessage("");
+    setFetchingAddr(true); setErrorMessage("");
     navigator.geolocation.getCurrentPosition(
       async ({ coords: { latitude, longitude } }) => {
         try {
@@ -565,10 +618,10 @@ export default function SmartLodge() {
     if (ctx.roundRect) { ctx.roundRect(bx, by, bw, bh, 15); ctx.fill(); } else ctx.fillRect(bx, by, bw, bh);
     const tx = bx + 20, ty = by + 35;
     ctx.textAlign = "left";
-    ctx.fillStyle = "white";      ctx.font = "bold 24px Arial"; ctx.fillText(area, tx, ty);
-    ctx.font = "14px Arial";      ctx.fillText(geoData.address || "", tx, ty + 25);
-    ctx.font = "14px monospace";  ctx.fillStyle = "#cbd5e1"; ctx.fillText(`Lat:${geoData.lat} Lng:${geoData.lng}`, tx, ty + 50);
-    ctx.font = "14px Arial";      ctx.fillStyle = "#fbbf24"; ctx.fillText(geoData.time || "", tx, ty + 75);
+    ctx.fillStyle  = "white";     ctx.font = "bold 24px Arial";  ctx.fillText(area, tx, ty);
+    ctx.font       = "14px Arial"; ctx.fillText(geoData.address || "", tx, ty + 25);
+    ctx.font       = "14px monospace"; ctx.fillStyle = "#cbd5e1"; ctx.fillText(`Lat:${geoData.lat} Lng:${geoData.lng}`, tx, ty + 50);
+    ctx.font       = "14px Arial"; ctx.fillStyle = "#fbbf24"; ctx.fillText(geoData.time || "", tx, ty + 75);
     canvas.toBlob((blob) => { setFile(new File([blob], "geo_evidence.jpg", { type: "image/jpeg" })); stopCamera(); }, "image/jpeg", 0.95);
   };
 
@@ -588,7 +641,7 @@ export default function SmartLodge() {
     } catch { setErrorMessage("Microphone access denied."); }
   };
 
-  // ── Submit ─────────────────────────────────────────────────────────────────
+  // ── Submit ──────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!hasText && !hasAudio && !hasImage) { setErrorMessage("Please provide at least one input — text, voice note, or image."); return; }
     if (conflictError) { setErrorMessage(conflictError); return; }
@@ -619,8 +672,6 @@ export default function SmartLodge() {
       await new Promise((r) => setTimeout(r, 1000));
       setSubmissionStage(SUBMISSION_STAGES.PROCESSING_AI);
 
-      // ── Dynamic timeout based on input mode ──────────────────────────────
-      // audio needs up to 3 Whisper attempts on CPU — give it 4.5 min minimum
       const timeoutMs = MODE_TIMEOUT_MS[inputMode] ?? 60_000;
 
       const res = await fetch(`${API_BASE}/api/grievances/submit`, {
@@ -632,26 +683,37 @@ export default function SmartLodge() {
       });
 
       if (res.status === 403) {
-        const json = await res.json();
+        const json = await res.json().catch(() => ({}));
         throw new Error(json.message || "Image location is outside Kakinada jurisdiction or contains no GPS data.");
       }
 
       const json = await res.json();
       if (json.success) {
         setSuccessData(json.data);
-        setPrediction(json.prediction ?? null);
+        // ── Normalise prediction shape ─────────────────────────────────────
+        // Express maps Flask response fields → camelCase on its end.
+        // We also handle snake_case fallback in case Express passes through
+        // Flask's raw response directly.
+        const pred = json.prediction ?? null;
+        if (pred) {
+          pred.evidenceRelevant = pred.evidenceRelevant ?? pred.evidence_relevant ?? null;
+          pred.evidenceNote     = pred.evidenceNote     ?? pred.evidence_note     ?? null;
+          pred.civicScore       = pred.civicScore       ?? pred.civic_score       ?? null;
+          pred.priorityBand     = pred.priorityBand     ?? pred.priority_band     ?? null;
+          pred.inputMode        = pred.inputMode        ?? pred.input_mode        ?? null;
+        }
+        setPrediction(pred);
         setSubmissionStage(SUBMISSION_STAGES.SUCCESS);
       } else {
         throw new Error(json.error || json.message || "Submission failed");
       }
     } catch (err) {
       setSubmissionStage(SUBMISSION_STAGES.ERROR);
-      // Give a helpful message for timeouts
       if (err.name === "TimeoutError" || err.name === "AbortError") {
         setErrorMessage(
           inputMode === "audio" || inputMode === "audio+image"
             ? "Request timed out — voice transcription took too long. Please try a shorter recording (under 10 seconds) or use text input instead."
-            : "Request timed out. Please try again."
+            : "Request timed out. Please try again.",
         );
       } else {
         setErrorMessage(err.message || "Network error. Please check your connection.");
@@ -670,13 +732,13 @@ export default function SmartLodge() {
   if (!isAuthed) return <AuthGate />;
   if (submissionStage === SUBMISSION_STAGES.SUCCESS) return <SuccessScreen successData={successData} prediction={prediction} onReset={handleReset} />;
 
-  const isSubmitting = [SUBMISSION_STAGES.VALIDATING, SUBMISSION_STAGES.UPLOADING, SUBMISSION_STAGES.ANALYZING, SUBMISSION_STAGES.PROCESSING_AI].includes(submissionStage);
+  const isSubmitting  = [SUBMISSION_STAGES.VALIDATING, SUBMISSION_STAGES.UPLOADING, SUBMISSION_STAGES.ANALYZING, SUBMISSION_STAGES.PROCESSING_AI].includes(submissionStage);
   const submitDisabled = isSubmitting || (!hasText && !hasAudio && !hasImage) || !!conflictError;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
 
-      {/* ── Submission Overlay ────────────────────────────────────────────── */}
+      {/* Submission Overlay */}
       {isSubmitting && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
@@ -695,7 +757,7 @@ export default function SmartLodge() {
         </div>
       )}
 
-      {/* ── Error Modal ───────────────────────────────────────────────────── */}
+      {/* Error Modal */}
       {submissionStage === SUBMISSION_STAGES.ERROR && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
@@ -730,7 +792,7 @@ export default function SmartLodge() {
 
         <div className="bg-white rounded-3xl border border-slate-100 shadow-lg p-6 space-y-6">
 
-          {/* ── 1. Citizen Details ────────────────────────────────────────── */}
+          {/* 1. Citizen Details */}
           <div>
             <SectionHead icon={User} label="Citizen Details" />
             <div className="space-y-4">
@@ -757,7 +819,7 @@ export default function SmartLodge() {
             </div>
           </div>
 
-          {/* ── 2. Description ────────────────────────────────────────────── */}
+          {/* 2. Description */}
           <div>
             <SectionHead icon={Type} label="Description of Issue" />
             <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all placeholder-slate-400 resize-none" placeholder="Describe the civic issue clearly — what it is, how long it has been there, and who is affected…" />
@@ -766,7 +828,7 @@ export default function SmartLodge() {
             {hasText &&  hasImage && !hasAudio && <TimingNote mode="text+image" />}
           </div>
 
-          {/* ── 3. Voice Note ─────────────────────────────────────────────── */}
+          {/* 3. Voice Note */}
           <div className={`rounded-3xl border-2 p-5 transition-all ${isRecording ? "border-red-200 bg-red-50/30" : audioBlob ? "border-green-200 bg-green-50/30" : "border-slate-100 bg-white"}`}>
             <SectionHead icon={Mic} label={isRecording ? "Recording…" : audioBlob ? "Voice Note Saved" : "Voice Note"}
               extra={audioBlob && (
@@ -777,8 +839,7 @@ export default function SmartLodge() {
             />
             {!audioBlob ? (
               <button onClick={toggleRecord} className={`w-full py-3 rounded-2xl font-bold text-sm border-2 transition-all flex items-center justify-center gap-2 ${isRecording ? "bg-red-600 text-white border-red-600 shadow-lg shadow-red-200" : "bg-slate-50 text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"}`}>
-                <Mic className="w-4 h-4" />
-                {isRecording ? "Tap to Stop Recording" : "Tap to Start Recording"}
+                <Mic className="w-4 h-4" />{isRecording ? "Tap to Stop Recording" : "Tap to Start Recording"}
               </button>
             ) : (
               <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-2xl text-green-700 text-sm font-bold">
@@ -790,7 +851,7 @@ export default function SmartLodge() {
             {audioBlob &&  hasImage && <TimingNote mode="audio+image" />}
           </div>
 
-          {/* ── 4. Visual Evidence ────────────────────────────────────────── */}
+          {/* 4. Visual Evidence */}
           <div className={`rounded-3xl border-2 p-5 transition-all ${file ? "border-green-200 bg-green-50/30" : isCameraOpen ? "border-blue-300 bg-blue-50/30" : "border-slate-100 bg-white"}`}>
             <SectionHead icon={Camera} label={file ? "Evidence Captured" : isCameraOpen ? "Camera Active" : "Visual Evidence"}
               extra={(file || isCameraOpen) && (
@@ -832,20 +893,28 @@ export default function SmartLodge() {
               </div>
             )}
             <FieldNote text="Geo-Camera embeds GPS coordinates and timestamp into the image — makes evidence tamper-evident and location-verified." />
+            {/* Evidence hint: civic content check runs on submit */}
+            {file && (
+              <div className="mt-2 flex items-start gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl">
+                <Info className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-slate-500 leading-snug">
+                  BLIP AI will verify this image shows a civic issue on submission. Irrelevant images are flagged but won&apos;t block your grievance.
+                </p>
+              </div>
+            )}
             {file && !hasAudio && !hasText && <TimingNote mode="image" />}
           </div>
 
-          {/* ── 5. Input Mode Indicator ───────────────────────────────────── */}
+          {/* 5. Input Mode Indicator */}
           <InputModeIndicator hasText={hasText} hasAudio={hasAudio} hasImage={hasImage} />
 
-          {/* ── Submit Button ─────────────────────────────────────────────── */}
+          {/* Submit */}
           <button onClick={handleSubmit} disabled={submitDisabled} className="group relative w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-bold text-base flex items-center justify-center gap-3 shadow-xl hover:shadow-2xl hover:shadow-slate-900/20 transition-all hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 overflow-hidden">
             <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
             <Send className="w-5 h-5 relative z-10" />
             <span className="relative z-10">{conflictError ? "Resolve Input Conflict to Submit" : "Submit Grievance"}</span>
           </button>
 
-          {/* Timing reminder under submit button */}
           {inputMode && MODE_TIMING[inputMode] && (
             <div className="flex items-center justify-center gap-1.5">
               <Clock className={`w-3.5 h-3.5 ${MODE_TIMING[inputMode].color}`} />
@@ -856,7 +925,7 @@ export default function SmartLodge() {
           )}
 
           <p className="text-center text-xs text-slate-400 font-medium">
-            Reviewed within 24 hours · Helpline: 1800-599-4116
+            Reviewed within 24 hours · 
           </p>
         </div>
       </div>

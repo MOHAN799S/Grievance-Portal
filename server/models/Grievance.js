@@ -166,8 +166,8 @@ const GrievanceSchema = new mongoose.Schema({
   // OR when no image is attached (text/audio only, coordinates trusted from client).
   //
   // locationStatus mirrors Flask's "location" field (only present for image evidence):
-  //   "valid"   — EXIF GPS confirmed inside Kakinada bounding box
-  //   "invalid" — EXIF GPS missing or outside Kakinada
+  //   "valid"   — GPS confirmed inside Kakinada + ward bounding box
+  //   "invalid" — GPS missing, outside Kakinada, or ward mismatch
   //   null      — no evidence image was submitted (text / audio only modes)
   location: {
     type: {
@@ -183,6 +183,48 @@ const GrievanceSchema = new mongoose.Schema({
   locationStatus: {
     type: String,
     enum: ['valid', 'invalid', null],
+    default: null
+  },
+
+  // 🖼️ EVIDENCE IMAGE RELEVANCE (SOFT FLAG)
+  //
+  // Flask runs an advanced civic image relevance scorer (weighted lexicon +
+  // non-civic override + BERT category alignment) on every submitted image.
+  // The grievance is NEVER rejected based on this — it is soft-flagged only.
+  //
+  // evidenceRelevant:
+  //   true   — image caption matches civic grievance content
+  //             AND (for text+image / audio+image) aligns with BERT category
+  //   false  — image is likely non-civic (selfie, food, nature, etc.)
+  //             OR image category mismatches the reported grievance category
+  //   null   — no image was submitted (text / audio only modes)
+  //
+  // evidenceNote:
+  //   Human-readable explanation from Flask explaining why the image was
+  //   flagged or verified. Shown to admins for manual review.
+  //   Examples:
+  //     "Image verified as civic evidence (category: roads, score: 5)."
+  //     "Image shows a 'garbage' issue but grievance is categorised as 'roads'."
+  //     "Non-civic content detected: 'person posing'"
+  //     "Image does not appear to show a civic issue (caption: '...', score: 0)."
+  //
+  // civicScore:
+  //   Raw weighted score from the lexicon scorer (0 = no civic match).
+  //   Useful for admin dashboards to rank evidence quality.
+  evidenceRelevant: {
+    type: Boolean,
+    default: null
+  },
+
+  evidenceNote: {
+    type: String,
+    default: null,
+    trim: true
+  },
+
+  civicScore: {
+    type: Number,
+    min: 0,
     default: null
   },
 
@@ -209,8 +251,9 @@ GrievanceSchema.index({ location: "2dsphere" }, { sparse: true });
 GrievanceSchema.index({ status: 1 });
 GrievanceSchema.index({ priority: 1 });
 GrievanceSchema.index({ createdAt: -1 });
-GrievanceSchema.index({ locationStatus: 1 });   // filter verified-location grievances
-GrievanceSchema.index({ inputMode: 1 });         // analytics by submission channel
+GrievanceSchema.index({ locationStatus: 1 });    // filter verified-location grievances
+GrievanceSchema.index({ inputMode: 1 });          // analytics by submission channel
+GrievanceSchema.index({ evidenceRelevant: 1 });   // admin review queue — flag irrelevant evidence
 
 
 // ===============================

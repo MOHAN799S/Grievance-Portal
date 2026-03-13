@@ -1,5 +1,7 @@
+"use client";
 import Link from "next/link";
 import { Shield, User, ArrowRight, Mic, Camera, MapPin, LayoutDashboard, Zap, BarChart3, Scale, Brain } from "lucide-react";
+import SnowFall from "react-snowfall"
 
 const CATEGORIES = [
   { label: "Electricity", icon: "⚡" },
@@ -51,6 +53,7 @@ const URGENCY = [
 export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden font-sans selection:bg-blue-100">
+      <SnowFall></SnowFall>
 
       {/* Background blobs */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">

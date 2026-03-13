@@ -808,8 +808,6 @@ app.post(
       const citizenName = req.user.name || "Anonymous";
 
       // ── File buffers from memoryStorage ───────────────────────────────────
-      // memoryStorage gives us .buffer (raw bytes in RAM).
-      // No disk path, no Cloudinary URL yet — upload happens AFTER Flask validates.
       const imageFile = req.files?.image?.[0] || null;
       const audioFile = req.files?.audio?.[0] || null;
 
@@ -827,12 +825,9 @@ app.post(
       }
 
       // ── Build native FormData for Flask ───────────────────────────────────
-      // IMPORTANT:
-      //   - Use Node 18+ native FormData (NOT npm form-data package)
-      //   - Wrap Buffer in new Blob([buffer], { type }) before appending
-      //   - Do NOT call .getHeaders() — that method only exists on npm form-data
-      //   - Do NOT set Content-Type header — native fetch sets
-      //     "multipart/form-data; boundary=..." automatically
+      // - Use Node 18+ native FormData (NOT npm form-data package)
+      // - Wrap Buffer in new Blob([buffer], { type }) before appending
+      // - Do NOT set Content-Type header — native fetch sets boundary automatically
       const flaskForm = new FormData();
 
       if (hasText) {
@@ -848,8 +843,6 @@ app.post(
       }
 
       if (hasAudio) {
-        // Browser MediaRecorder records audio/webm regardless of requested type.
-        // Use actual mimetype from file object, fall back to audio/webm.
         const audioMime = audioFile.mimetype || "audio/webm";
         const audioName = audioFile.originalname
           || (audioMime.includes("webm") ? "audio.webm"
@@ -866,35 +859,34 @@ app.post(
 
       flaskForm.append("explain", "true");
 
-// ✅ Forward GPS coordinates so Flask can validate location when EXIF is absent
-if (req.body.latitude)  flaskForm.append("latitude",  req.body.latitude);
-if (req.body.longitude) flaskForm.append("longitude", req.body.longitude);
-if(req.body.area)      flaskForm.append("area",      req.body.area);
-console.log(flaskForm);
+      // ✅ Forward GPS + area so Flask can:
+      //    1. Validate location when EXIF is absent (GPS fallback)
+      //    2. Validate ward-level bounding box match
+      //    3. Run civic image relevance check per category
+      if (req.body.latitude)  flaskForm.append("latitude",  req.body.latitude);
+      if (req.body.longitude) flaskForm.append("longitude", req.body.longitude);
+      if (req.body.area)      flaskForm.append("area",      req.body.area);
+
       // ── Call Flask /predict ────────────────────────────────────────────────
       let aiPrediction;
       const timeoutMs = (hasAudio && hasImage) ? 480_000   // 8 min
-                : hasAudio               ? 420_000   // 7 min
-                : hasImage               ?  90_000   // 1.5 min
-                :                           30_000; // 30s text
+                      : hasAudio               ? 420_000   // 7 min
+                      : hasImage               ?  90_000   // 1.5 min
+                      :                           30_000;  // 30s text
       try {
         const predRes = await fetch(`${FLASK_URL}/predict`, {
           method: "POST",
           body:   flaskForm,
-          // NO headers object — native fetch sets Content-Type + boundary automatically
-          // Adding headers here (especially Content-Type) breaks the multipart boundary
-          // In your submit route — find AbortSignal.timeout and replace with:
-
-signal: AbortSignal.timeout(timeoutMs),
+          signal: AbortSignal.timeout(timeoutMs),
         });
 
-        // Flask 403 — image-only with invalid/missing GPS
-        // Buffer already discarded — nothing uploaded to Cloudinary
+        // Flask 403 — location invalid or ward mismatch
+        // Nothing has been uploaded to Cloudinary yet — safe to reject here.
         if (predRes.status === 403) {
           const detail = await predRes.json().catch(() => ({}));
           return res.status(403).json({
             success:  false,
-            message:  detail.message || "Grievance rejected. Invalid location: GPS coordinates do not match the selected ward or Image location is outside Kakinada jurisdiction or contains no GPS data.",
+            message:  detail.message || "Grievance rejected. Invalid location: GPS coordinates do not match the selected ward or image is outside Kakinada jurisdiction.",
             location: "invalid",
             detail,
           });
@@ -916,24 +908,40 @@ signal: AbortSignal.timeout(timeoutMs),
         console.error("⚠️  AI Service Error:", predErr.message);
         return res.status(503).json({
           success: false,
-          message: "AI prediction service unavailable.",
+          message: predErr.message || "AI prediction service unavailable.",
           detail:  predErr.message,
         });
       }
 
+      // ── Extract all Flask response fields ─────────────────────────────────
+      const flaskLocationStatus = aiPrediction.location          ?? null;  // "valid"|"invalid"|null
+      const transcribedText     = aiPrediction.text              || "";
+
+      // ── Evidence relevance (soft flag from Flask civic image scorer) ───────
+      // evidence_relevant = true   → image is valid civic evidence
+      // evidence_relevant = false  → image is irrelevant/non-civic (flagged only, NOT rejected)
+      // evidence_relevant = null   → no image was submitted
+      const evidenceRelevant    = aiPrediction.evidence_relevant ?? null;   // bool | null
+      const evidenceNote        = aiPrediction.evidence_note     ?? null;   // string | null
+      const civicScore          = aiPrediction.civic_score       ?? null;   // int | null
+
+      // Log evidence relevance for monitoring
+      if (evidenceRelevant !== null) {
+        console.log(
+          `[submit] Evidence relevance: relevant=${evidenceRelevant} ` +
+          `score=${civicScore} note="${evidenceNote}"`,
+        );
+      }
+
       // ── Conditional Cloudinary upload ─────────────────────────────────────
-      // Image: upload only when Flask says location is valid,
-      //        OR when mode is text+image / audio+image (locationStatus = null,
-      //        GPS is not the primary check for those modes).
-      //        image-only with bad GPS → Flask returns 403 above, never reaches here.
+      // Image:
+      //   - text+image / audio+image (location=null) → always upload
+      //   - image-only with valid location            → upload
+      //   - image-only with invalid GPS               → Flask returns 403 above, never here
+      //   - non-civic image (evidence_relevant=false) → still upload (soft flag only)
       //
       // Audio: upload only if Whisper returned non-empty transcription.
-      //        Silent / failed transcription → audioUrl stays null.
-      //
-      // Upload failure is non-fatal — log it, save grievance with null URL.
-
-      const flaskLocationStatus = aiPrediction.location ?? null; // "valid"|"invalid"|null
-      const transcribedText     = aiPrediction.text     || "";
+      // Upload failure is non-fatal — log and continue with null URL.
 
       let imageUrl = null;
       let audioUrl = null;
@@ -966,15 +974,15 @@ signal: AbortSignal.timeout(timeoutMs),
 
       // ── Resolve description ────────────────────────────────────────────────
       // text mode  → citizen's typed text
-      // audio mode → Whisper transcription returned by Flask in "text" field
-      // image mode → BLIP caption returned by Flask in "text" field
+      // audio mode → Whisper transcription from Flask "text" field
+      // image mode → BLIP caption from Flask "text" field
       const description = hasText
         ? textInput
         : (transcribedText || "Media Evidence Submitted");
 
       const inputMode = aiPrediction.input_mode || "text";
 
-      // ── GeoJSON location ──────────────────────────────────────────────────
+      // ── GeoJSON location ───────────────────────────────────────────────────
       let geoLocation = undefined;
       if (req.body.latitude && req.body.longitude) {
         geoLocation = {
@@ -1013,11 +1021,18 @@ signal: AbortSignal.timeout(timeoutMs),
           urgencyTokens:    sanitizeTokens(aiPrediction.explanation?.urgency_tokens),
         },
 
-        imageUrl,          // null if GPS invalid or Cloudinary upload failed
-        audioUrl,          // null if transcription empty or Cloudinary upload failed
+        imageUrl,
+        audioUrl,
 
         location:       geoLocation,
-        locationStatus: flaskLocationStatus,  // "valid" | "invalid" | null
+        locationStatus: flaskLocationStatus,   // "valid" | "invalid" | null
+
+        // ── Evidence relevance fields ──────────────────────────────────────
+        // Stored so admins can filter/flag grievances with unverified evidence.
+        // evidenceRelevant=false means image was non-civic but grievance was accepted.
+        evidenceRelevant,   // bool | null
+        evidenceNote,       // string | null — reason for flag
+        civicScore,         // int | null — weighted lexicon match score
       });
 
       // ── Respond to client ──────────────────────────────────────────────────
@@ -1034,6 +1049,13 @@ signal: AbortSignal.timeout(timeoutMs),
           inputMode,
           locationStatus:     flaskLocationStatus,
           explanation:        aiPrediction.explanation ?? null,
+
+          // ── Evidence relevance — forwarded to frontend for UI display ──────
+          // Frontend can show a warning badge like:
+          // "⚠️ Evidence image may not match reported issue"
+          evidenceRelevant,
+          evidenceNote,
+          civicScore,
         },
       });
 
@@ -1041,7 +1063,7 @@ signal: AbortSignal.timeout(timeoutMs),
       console.error("[POST /api/grievances/submit]", err);
       return res.status(500).json({
         success: false,
-        message: "Failed to submit grievance",
+        message: err.message || "Failed to submit grievance",
         error:   err.message,
       });
     }
