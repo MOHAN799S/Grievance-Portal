@@ -227,25 +227,191 @@ const verifyCitizen = (req, res, next) =>
 // 📧 EMAIL TEMPLATE
 // =============================
 const buildOtpEmail = (otp) => `
-<div style="margin:0;padding:40px 0;background:#f2f2f2;font-family:'Segoe UI',Arial,sans-serif;">
-  <div style="max-width:520px;margin:0 auto;padding:40px 30px;background:rgba(255,255,255,0.65);
-    backdrop-filter:blur(8px);border:1px solid rgba(0,0,0,0.08);border-radius:12px;
-    box-shadow:0 8px 24px rgba(0,0,0,0.06);text-align:center;">
-    <h1 style="margin:0 0 10px;font-size:20px;font-weight:600;color:#111;letter-spacing:0.5px;">
-      Civic Connect Portal
-    </h1>
-    <p style="margin:0 0 30px;font-size:13px;color:#444;">Government Grievance &amp; Citizen Services Notification</p>
-    <div style="margin:20px 0;padding:20px 0;border-top:1px solid #e5e5e5;border-bottom:1px solid #e5e5e5;">
-      <p style="margin:0 0 12px;font-size:14px;color:#333;">Your One-Time Verification Code</p>
-      <div style="font-size:34px;font-weight:700;letter-spacing:10px;color:#000;">${otp}</div>
-    </div>
-    <p style="margin:20px 0 5px;font-size:13px;color:#555;">This code is valid for <strong>5 minutes</strong>.</p>
-    <p style="margin:0;font-size:12px;color:#777;">Do not share this code with anyone.</p>
-    <div style="margin-top:35px;font-size:11px;color:#888;border-top:1px solid #eaeaea;padding-top:15px;">
-      © ${new Date().getFullYear()} Civic Connect Portal<br/>Municipal Digital Services Platform
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>Verification Code</title>
+
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    background: #f6f7f9;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #111827;
+  }
+
+  .wrapper {
+    padding: 40px 16px;
+  }
+
+  .container {
+    max-width: 480px;
+    margin: auto;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .header {
+    padding: 20px 28px;
+    border-bottom: 1px solid #f1f3f5;
+  }
+
+  .title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .subtitle {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 4px;
+  }
+
+  .body {
+    padding: 28px;
+  }
+
+  .heading {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .text {
+    font-size: 14px;
+    color: #4b5563;
+    line-height: 1.6;
+  }
+
+  .otp-box {
+    text-align: center;
+    margin: 28px 0;
+  }
+
+  .otp {
+    display: inline-block;
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: 10px;
+    padding: 16px 20px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fafafa;
+    color: #111827;
+    font-family: 'Courier New', monospace;
+  }
+
+  .divider {
+    height: 1px;
+    background: #f1f3f5;
+    margin: 24px 0;
+  }
+
+  .footer {
+    padding: 16px 28px;
+    border-top: 1px solid #f1f3f5;
+    font-size: 11px;
+    color: #9ca3af;
+  }
+
+  /* 🌙 Dark Mode */
+  @media (prefers-color-scheme: dark) {
+    body {
+      background: #0b0c0e !important;
+      color: #e5e7eb !important;
+    }
+
+    .container {
+      background: #111315 !important;
+      border: 1px solid #2a2d31 !important;
+    }
+
+    .header {
+      border-bottom: 1px solid #2a2d31 !important;
+    }
+
+    .title {
+      color: #f3f4f6 !important;
+    }
+
+    .subtitle {
+      color: #9ca3af !important;
+    }
+
+    .heading {
+      color: #f9fafb !important;
+    }
+
+    .text {
+      color: #9ca3af !important;
+    }
+
+    .otp {
+      background: #1a1c1f !important;
+      border: 1px solid #2a2d31 !important;
+      color: #f9fafb !important;
+    }
+
+    .divider {
+      background: #2a2d31 !important;
+    }
+
+    .footer {
+      border-top: 1px solid #2a2d31 !important;
+      color: #6b7280 !important;
+    }
+  }
+</style>
+</head>
+
+<body>
+  <div class="wrapper">
+    <div class="container">
+
+      <!-- Header -->
+      <div class="header">
+        <div class="title">Civic Connect</div>
+        <div class="subtitle">Secure Verification</div>
+      </div>
+
+      <!-- Body -->
+      <div class="body">
+        <div class="heading">Your Verification Code</div>
+
+        <p class="text">
+          Use the one-time passcode below to complete your authentication.
+          This code is valid for <strong>5 minutes</strong>.
+        </p>
+
+        <!-- OTP -->
+        <div class="otp-box">
+          <span class="otp">${otp}</span>
+        </div>
+
+        <div class="divider"></div>
+
+        <p class="text">
+          Do not share this code with anyone. If you did not request this, you can safely ignore this email.
+        </p>
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        © ${new Date().getFullYear()} Civic Connect. All rights reserved.
+      </div>
+
     </div>
   </div>
-</div>`;
+</body>
+</html>
+`;
 
 // =============================
 // ⚖️ GFAS FAIRNESS HELPERS
