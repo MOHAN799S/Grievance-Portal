@@ -1,4 +1,5 @@
 "use client";
+import { useRef } from "react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -20,8 +21,78 @@ const INDIAN_STATES = [
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-const inputBase = "w-full py-2.5 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none text-slate-900 placeholder-slate-400 transition-all text-sm shadow-sm";
-const inputErr  = "border-red-400 focus:border-red-400 focus:ring-red-400/15";
+// ── Email domain validation ─────────────────────────────────────────────────
+const DOMAIN_TYPO_MAP = {
+  // Gmail typos
+  "gmial.com": "gmail.com", "gmal.com": "gmail.com", "gmaill.com": "gmail.com",
+  "gamil.com": "gmail.com", "gnail.com": "gmail.com", "gmaik.com": "gmail.com",
+  "gmil.com": "gmail.com", "gmai.com": "gmail.com", "gmail.co": "gmail.com",
+  "gmail.con": "gmail.com", "gmail.om": "gmail.com", "gmail.cm": "gmail.com",
+  "gmail.cim": "gmail.com", "gmail.vom": "gmail.com", "gmail.comm": "gmail.com",
+  "gmail.xom": "gmail.com", "gmail.cpm": "gmail.com", "gmail.ocm": "gmail.com",
+  "gemail.com": "gmail.com", "gimail.com": "gmail.com",
+  // Yahoo typos
+  "yahoi.com": "yahoo.com", "yaho.com": "yahoo.com", "yahooo.com": "yahoo.com",
+  "yhaoo.com": "yahoo.com", "yaoo.com": "yahoo.com", "yahho.com": "yahoo.com",
+  "yahu.com": "yahoo.com", "yahoo.con": "yahoo.com", "yahoo.co": "yahoo.com",
+  "yahoo.cm": "yahoo.com", "yahoo.om": "yahoo.com", "yahoo.comm": "yahoo.com",
+  // Outlook typos
+  "outlok.com": "outlook.com", "outllok.com": "outlook.com",
+  "outlokk.com": "outlook.com", "outloo.com": "outlook.com",
+  "outlool.com": "outlook.com", "outlook.con": "outlook.com",
+  "outlook.co": "outlook.com", "outook.com": "outlook.com",
+  "putlook.com": "outlook.com", "oultook.com": "outlook.com",
+  // Hotmail typos
+  "hotmal.com": "hotmail.com", "hotmai.com": "hotmail.com",
+  "hotmial.com": "hotmail.com", "hotamil.com": "hotmail.com",
+  "hotmail.con": "hotmail.com", "hotmail.co": "hotmail.com",
+  "hotmil.com": "hotmail.com", "htmail.com": "hotmail.com",
+  // Rediffmail typos
+  "redifmail.com": "rediffmail.com", "redifffmail.com": "rediffmail.com",
+  "rediffmal.com": "rediffmail.com", "rediffmail.con": "rediffmail.com",
+  // Other common typos
+  "emal.com": "gmail.com", "emal.co": "gmail.com",
+  "email.com": "gmail.com",
+  "protonmail.con": "protonmail.com",
+  "icloud.con": "icloud.com", "icoud.com": "icloud.com",
+};
+
+function validateEmailDomain(email) {
+  const parts = email.split("@");
+  if (parts.length !== 2) return "Enter a valid email address.";
+
+  const local = parts[0];
+  const domain = parts[1].toLowerCase().trim();
+
+  if (DOMAIN_TYPO_MAP[domain]) {
+    return `Did you mean ${local}@${DOMAIN_TYPO_MAP[domain]}?`;
+  }
+
+  if (
+    domain.includes(" ") ||
+    domain.startsWith(".") ||
+    domain.endsWith(".") ||
+    !domain.includes(".")
+  ) {
+    return "Invalid email domain.";
+  }
+
+  const ALLOWED_DOMAINS = [
+    "gmail.com", "yahoo.com", "yahoo.in", "outlook.com", "hotmail.com"
+  ];
+  const GOV_REGEX = /\.(gov\.in|nic\.in)$/;
+  const EDU_REGEX = /\.(edu\.in|ac\.in)$/;
+
+  if (ALLOWED_DOMAINS.includes(domain)) return null;
+  if (GOV_REGEX.test(domain)) return null;
+  if (EDU_REGEX.test(domain)) return null;
+
+  return "Only Gmail, Yahoo, Outlook or Government/Education emails are allowed.";
+}
+
+const inputBase =
+  "w-full py-2.5 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none text-slate-900 placeholder-slate-400 transition-all text-sm shadow-sm";
+const inputErr = "border-red-400 focus:border-red-400 focus:ring-red-400/15";
 
 function FieldError({ msg }) {
   if (!msg) return null;
@@ -42,19 +113,36 @@ function SectionHead({ icon: Icon, label }) {
 
 export default function CitizenLogin() {
   const router = useRouter();
-  const [view, setView] = useState("login");
-  const [loading, setLoading] = useState(false);
+
+  // ── FIX 1: All refs defined INSIDE the component ──────────────────────────
+  const refs = {
+    fullName:        useRef(null),
+    email:           useRef(null),
+    mobileNumber:    useRef(null),
+    dateOfBirth:     useRef(null),
+    gender:          useRef(null),
+    aadhaarNumber:   useRef(null),
+    address:         useRef(null),
+    city:            useRef(null),
+    district:        useRef(null),
+    pincode:         useRef(null),
+    password:        useRef(null),
+    confirmPassword: useRef(null),
+  };
+
+  const [view, setView]           = useState("login");
+  const [loading, setLoading]     = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
 
-  const [showPw, setShowPw]  = useState(false);
+  const [showPw, setShowPw]   = useState(false);
   const [showCPw, setShowCPw] = useState(false);
   const [showLPw, setShowLPw] = useState(false);
 
-  const [otp, setOtp]           = useState(["","","","","",""]);
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [resendTimer, setResendTimer] = useState(60);
-  const [canResend, setCanResend]     = useState(false);
-  const [tempUser, setTempUser]       = useState(null);
+  const [otp, setOtp]                   = useState(["","","","","",""]);
+  const [otpLoading, setOtpLoading]     = useState(false);
+  const [resendTimer, setResendTimer]   = useState(60);
+  const [canResend, setCanResend]       = useState(false);
+  const [tempUser, setTempUser]         = useState(null);
 
   const [loginEmail, setLoginEmail]       = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -64,25 +152,47 @@ export default function CitizenLogin() {
   const [addrFetched, setAddrFetched]   = useState(false);
 
   const [form, setForm] = useState({
-    fullName:"", email:"", password:"", confirmPassword:"",
-    mobileNumber:"", dateOfBirth:"", gender:"", aadhaarNumber:"",
-    address:"", city:"", district:"", state:"Andhra Pradesh", pincode:"",
-    occupation:"",
+    fullName: "", email: "", password: "", confirmPassword: "",
+    mobileNumber: "", dateOfBirth: "", gender: "", aadhaarNumber: "",
+    address: "", city: "", district: "", state: "Andhra Pradesh", pincode: "",
+    occupation: "",
   });
   const [formErrors, setFormErrors] = useState({});
 
-  useEffect(() => { setSuccessMsg(""); setFormErrors({}); setLoginErrors({}); }, [view]);
+  useEffect(() => {
+    setSuccessMsg("");
+    setFormErrors({});
+    setLoginErrors({});
+  }, [view]);
 
   useEffect(() => {
     if (view === "otp" && resendTimer > 0) {
       const t = setTimeout(() => setResendTimer(r => r - 1), 1000);
       return () => clearTimeout(t);
-    } else if (resendTimer === 0) setCanResend(true);
+    } else if (resendTimer === 0) {
+      setCanResend(true);
+    }
   }, [resendTimer, view]);
 
   const setField = (n, v) => setForm(p => ({ ...p, [n]: v }));
-  const clearFE  = (n)    => setFormErrors(p => { const x = {...p}; delete x[n]; return x; });
-  const clearLE  = (n)    => setLoginErrors(p => { const x = {...p}; delete x[n]; return x; });
+  const clearFE  = (n)    => setFormErrors(p => { const x = { ...p }; delete x[n]; return x; });
+  const clearLE  = (n)    => setLoginErrors(p => { const x = { ...p }; delete x[n]; return x; });
+
+  // ── FIX 2: focusFirstError now wired up and used properly ─────────────────
+  const focusFirstError = (errors) => {
+    const order = [
+      "fullName", "email", "mobileNumber", "dateOfBirth", "gender",
+      "aadhaarNumber", "address", "city", "district", "pincode",
+      "password", "confirmPassword",
+    ];
+    for (const field of order) {
+      if (errors[field] && refs[field]?.current) {
+        refs[field].current.focus();
+        refs[field].current.scrollIntoView({ behavior: "smooth", block: "center" });
+        break;
+      }
+    }
+  };
 
   // ── Fetch address via Geolocation + Nominatim ─────────────────────────────
   const handleFetchAddress = () => {
@@ -107,7 +217,7 @@ export default function CitizenLogin() {
             city:     a.city || a.town || a.village || a.county || "",
             district: a.county || a.state_district || "",
             pincode:  a.postcode || "",
-            state:    INDIAN_STATES.find(s => s.toLowerCase() === (a.state||"").toLowerCase()) || p.state,
+            state:    INDIAN_STATES.find(s => s.toLowerCase() === (a.state || "").toLowerCase()) || p.state,
           }));
           setAddrFetched(true);
           clearFE("address"); clearFE("city"); clearFE("district"); clearFE("pincode");
@@ -127,8 +237,14 @@ export default function CitizenLogin() {
   const handleLogin = async (e) => {
     e.preventDefault();
     const errs = {};
-    if (!loginEmail) errs.email = "Email is required.";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginEmail)) errs.email = "Enter a valid email address.";
+    if (!loginEmail)
+      errs.email = "Email is required.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginEmail))
+      errs.email = "Enter a valid email address.";
+    else {
+      const domErr = validateEmailDomain(loginEmail);
+      if (domErr) errs.email = domErr;
+    }
     if (!loginPassword) errs.password = "Password is required.";
     if (Object.keys(errs).length) { setLoginErrors(errs); return; }
 
@@ -143,14 +259,13 @@ export default function CitizenLogin() {
       const data = await res.json();
 
       if (data.success) {
-        // ✅ Correct keys — matches what SmartLodge, CitizenHistory, and useAuth read
-if (data.token)        localStorage.setItem("citizenToken",        data.token);
-if (data.refreshToken) localStorage.setItem("refreshToken", data.refreshToken);
-localStorage.setItem("citizen_user", JSON.stringify({
-  name:  data.user.fullName || data.user.name,
-  email: data.user.email,
-  role:  data.role,
-}));
+        if (data.token)        localStorage.setItem("citizenToken", data.token);
+        if (data.refreshToken) localStorage.setItem("refreshToken", data.refreshToken);
+        localStorage.setItem("citizen_user", JSON.stringify({
+          name:  data.user.fullName || data.user.name,
+          email: data.user.email,
+          role:  data.role,
+        }));
         router.push("/citizen/lodge");
       } else {
         const msg = data.message || "Login failed.";
@@ -168,37 +283,69 @@ localStorage.setItem("citizen_user", JSON.stringify({
   const handleSignUp = async (e) => {
     e.preventDefault();
     const errs = {};
-    if (!form.fullName.trim())                                         errs.fullName        = "Full name is required.";
-    if (!form.email)                                                   errs.email           = "Email is required.";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))         errs.email           = "Enter a valid email.";
-    if (!form.mobileNumber)                                            errs.mobileNumber    = "Mobile number is required.";
-    else if (!/^[6-9]\d{9}$/.test(form.mobileNumber))                 errs.mobileNumber    = "Enter a valid 10-digit mobile number.";
-    if (!form.dateOfBirth)                                             errs.dateOfBirth     = "Date of birth is required.";
-    if (!form.gender)                                                  errs.gender          = "Please select gender.";
-    if (!form.aadhaarNumber)                                           errs.aadhaarNumber   = "Aadhaar number is required.";
-    else if (!/^\d{12}$/.test(form.aadhaarNumber))                    errs.aadhaarNumber   = "Enter a valid 12-digit Aadhaar number.";
-    if (!form.address.trim())                                          errs.address         = "Address is required.";
-    if (!form.city.trim())                                             errs.city            = "City is required.";
-    if (!form.district.trim())                                         errs.district        = "District is required.";
-    if (!form.pincode)                                                 errs.pincode         = "Pincode is required.";
-    else if (!/^\d{6}$/.test(form.pincode))                           errs.pincode         = "Enter a valid 6-digit pincode.";
-    if (!form.password)                                                errs.password        = "Password is required.";
-    else if (form.password.length < 8)                                 errs.password        = "Password must be at least 8 characters.";
-    if (!form.confirmPassword)                                         errs.confirmPassword = "Please confirm your password.";
-    else if (form.password !== form.confirmPassword)                   errs.confirmPassword = "Passwords do not match.";
 
-    if (Object.keys(errs).length) { setFormErrors(errs); return; }
+    if (!form.fullName.trim())
+      errs.fullName = "Full name is required.";
+    if (!form.email)
+      errs.email = "Email is required.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+      errs.email = "Enter a valid email.";
+    else {
+      const domErr = validateEmailDomain(form.email);
+      if (domErr) errs.email = domErr;
+    }
+    if (!form.mobileNumber)
+      errs.mobileNumber = "Mobile number is required.";
+    else if (!/^[6-9]\d{9}$/.test(form.mobileNumber))
+      errs.mobileNumber = "Enter a valid 10-digit mobile number.";
+    if (!form.dateOfBirth)
+      errs.dateOfBirth = "Date of birth is required.";
+    if (!form.gender)
+      errs.gender = "Please select gender.";
+    if (!form.aadhaarNumber)
+      errs.aadhaarNumber = "Aadhaar number is required.";
+    else if (!/^\d{12}$/.test(form.aadhaarNumber))
+      errs.aadhaarNumber = "Enter a valid 12-digit Aadhaar number.";
+    if (!form.address.trim())
+      errs.address = "Address is required.";
+    if (!form.city.trim())
+      errs.city = "City is required.";
+    if (!form.district.trim())
+      errs.district = "District is required.";
+    if (!form.pincode)
+      errs.pincode = "Pincode is required.";
+    else if (!/^\d{6}$/.test(form.pincode))
+      errs.pincode = "Enter a valid 6-digit pincode.";
+    if (!form.password)
+      errs.password = "Password is required.";
+    else if (form.password.length < 8)
+      errs.password = "Password must be at least 8 characters.";
+    if (!form.confirmPassword)
+      errs.confirmPassword = "Please confirm your password.";
+    else if (form.password !== form.confirmPassword)
+      errs.confirmPassword = "Passwords do not match.";
+
+    if (Object.keys(errs).length) {
+      setFormErrors(errs);
+      // ── FIX 3: focusFirstError now actually called on validation failure ──
+      focusFirstError(errs);
+      return;
+    }
 
     setLoading(true);
     try {
       const res  = await fetch(`${BASE}/api/auth/send-otp`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: form.email, mobileNumber: form.mobileNumber }),
       });
       const data = await res.json();
       if (data.success) {
-        setTempUser(form); setView("otp"); setResendTimer(60); setCanResend(false);
-        setSuccessMsg("OTP sent to your  email.");
+        setTempUser(form);
+        setView("otp");
+        setResendTimer(60);
+        setCanResend(false);
+        setSuccessMsg("OTP sent to your email.");
       } else {
         setFormErrors({ email: data.message || "Failed to send OTP." });
       }
@@ -211,17 +358,27 @@ localStorage.setItem("citizen_user", JSON.stringify({
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     const val = otp.join("");
-    if (val.length !== 6) { setFormErrors({ otp: "Enter the complete 6-digit OTP." }); return; }
-    setOtpLoading(true); setFormErrors({});
+    if (val.length !== 6) {
+      setFormErrors({ otp: "Enter the complete 6-digit OTP." });
+      return;
+    }
+    setOtpLoading(true);
+    setFormErrors({});
     try {
       const res  = await fetch(`${BASE}/api/auth/verify-otp`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: tempUser.email, otp: val, userData: tempUser }),
       });
       const data = await res.json();
       if (data.success) {
         setSuccessMsg("Account created! Please sign in.");
-        setTimeout(() => { setView("login"); setOtpLoading(false); setOtp(["","","","","",""]); setTempUser(null); }, 1500);
+        setTimeout(() => {
+          setView("login");
+          setOtpLoading(false);
+          setOtp(["","","","","",""]);
+          setTempUser(null);
+        }, 1500);
       } else {
         setFormErrors({ otp: data.message || "Invalid OTP. Try again." });
         setOtpLoading(false);
@@ -234,38 +391,53 @@ localStorage.setItem("citizen_user", JSON.stringify({
 
   const handleResendOtp = async () => {
     if (!canResend) return;
-    setCanResend(false); setResendTimer(60); setFormErrors({});
+    setCanResend(false);
+    setResendTimer(60);
+    setFormErrors({});
     try {
       const res  = await fetch(`${BASE}/api/auth/send-otp`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: tempUser.email, mobileNumber: tempUser.mobileNumber }),
       });
       const data = await res.json();
-      if (data.success) { setSuccessMsg("OTP resent!"); setOtp(["","","","","",""]); }
-      else { setFormErrors({ otp: data.message || "Failed to resend." }); setCanResend(true); }
-    } catch { setFormErrors({ otp: "Failed to resend." }); setCanResend(true); }
+      if (data.success) {
+        setSuccessMsg("OTP resent!");
+        setOtp(["","","","","",""]);
+      } else {
+        setFormErrors({ otp: data.message || "Failed to resend." });
+        setCanResend(true);
+      }
+    } catch {
+      setFormErrors({ otp: "Failed to resend." });
+      setCanResend(true);
+    }
   };
 
   const handleOtpChange = (i, val) => {
     if (!/^\d*$/.test(val)) return;
-    const n = [...otp]; n[i] = val; setOtp(n);
-    if (val && i < 5) document.getElementById(`otp-${i+1}`)?.focus();
+    const n = [...otp];
+    n[i] = val;
+    setOtp(n);
+    if (val && i < 5) document.getElementById(`otp-${i + 1}`)?.focus();
   };
+
   const handleOtpKey = (i, e) => {
-    if (e.key === "Backspace" && !otp[i] && i > 0) document.getElementById(`otp-${i-1}`)?.focus();
+    if (e.key === "Backspace" && !otp[i] && i > 0)
+      document.getElementById(`otp-${i - 1}`)?.focus();
   };
 
   // ── render ─────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden font-sans selection:bg-blue-100">
 
-      {/* Background blobs — identical to landing page */}
+      {/* Background blobs */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
         <div className="absolute -top-[20%] -right-[10%] w-[600px] h-[600px] bg-blue-100/40 rounded-full blur-3xl opacity-60" />
         <div className="absolute top-[20%] -left-[10%] w-[400px] h-[400px] bg-indigo-100/40 rounded-full blur-3xl opacity-60" />
       </div>
 
-      {/* Nav — identical to landing page */}
+      {/* Nav */}
       <nav className="relative z-10 w-full max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
         <Link href="/" className="flex items-center gap-3">
           <div className="bg-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-600/20">
@@ -320,7 +492,7 @@ localStorage.setItem("citizen_user", JSON.stringify({
             <div className="h-1 w-full bg-gradient-to-r from-blue-600 to-indigo-600" />
             <div className="p-6 md:p-8">
 
-              {/* ────────── LOGIN ────────── */}
+              {/* ── LOGIN ── */}
               {view === "login" && (
                 <form onSubmit={handleLogin} autoComplete="off" className="space-y-4" noValidate>
                   <div>
@@ -329,10 +501,14 @@ localStorage.setItem("citizen_user", JSON.stringify({
                     </label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                      <input type="email" autoComplete="off" value={loginEmail}
+                      <input
+                        type="email"
+                        autoComplete="off"
+                        value={loginEmail}
                         onChange={e => { setLoginEmail(e.target.value); clearLE("email"); }}
                         className={`${inputBase} pl-10 pr-3 ${loginErrors.email ? inputErr : ""}`}
-                        placeholder="Enter your registered email" />
+                        placeholder="Enter your registered email"
+                      />
                     </div>
                     <FieldError msg={loginErrors.email} />
                   </div>
@@ -343,10 +519,14 @@ localStorage.setItem("citizen_user", JSON.stringify({
                     </label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                      <input type={showLPw ? "text" : "password"} autoComplete="off" value={loginPassword}
+                      <input
+                        type={showLPw ? "text" : "password"}
+                        autoComplete="off"
+                        value={loginPassword}
                         onChange={e => { setLoginPassword(e.target.value); clearLE("password"); }}
                         className={`${inputBase} pl-10 pr-10 ${loginErrors.password ? inputErr : ""}`}
-                        placeholder="Enter your password" />
+                        placeholder="Enter your password"
+                      />
                       <button type="button" onClick={() => setShowLPw(p => !p)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
                         {showLPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -364,14 +544,16 @@ localStorage.setItem("citizen_user", JSON.stringify({
                   </button>
 
                   <p className="text-center text-sm text-slate-500 pt-1">
-                    Don't have an account?{" "}
+                    Don&apos;t have an account?{" "}
                     <button type="button" onClick={() => setView("signup")}
-                      className="text-blue-600 font-bold hover:text-blue-700 transition-colors">Register Now</button>
+                      className="text-blue-600 font-bold hover:text-blue-700 transition-colors">
+                      Register Now
+                    </button>
                   </p>
                 </form>
               )}
 
-              {/* ────────── SIGNUP ────────── */}
+              {/* ── SIGNUP ── */}
               {view === "signup" && (
                 <form onSubmit={handleSignUp} autoComplete="off" className="space-y-6" noValidate>
 
@@ -381,72 +563,118 @@ localStorage.setItem("citizen_user", JSON.stringify({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Full Name <span className="text-blue-500">*</span></label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          Full Name <span className="text-blue-500">*</span>
+                        </label>
                         <div className="relative">
                           <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                          <input type="text" value={form.fullName}
+                          {/* FIX 4: ref attached to input */}
+                          <input
+                            type="text"
+                            ref={refs.fullName}
+                            value={form.fullName}
                             onChange={e => { setField("fullName", e.target.value); clearFE("fullName"); }}
                             className={`${inputBase} pl-10 pr-3 ${formErrors.fullName ? inputErr : ""}`}
-                            placeholder="Full name as per Aadhaar" />
+                            placeholder="Full name as per Aadhaar"
+                          />
                         </div>
                         <FieldError msg={formErrors.fullName} />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Email <span className="text-blue-500">*</span></label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          Email <span className="text-blue-500">*</span>
+                        </label>
                         <div className="relative">
                           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                          <input type="email" value={form.email}
+                          <input
+                            type="email"
+                            ref={refs.email}
+                            value={form.email}
                             onChange={e => { setField("email", e.target.value); clearFE("email"); }}
                             className={`${inputBase} pl-10 pr-3 ${formErrors.email ? inputErr : ""}`}
-                            placeholder="name@example.com" />
+                            placeholder="name@example.com"
+                          />
                         </div>
                         <FieldError msg={formErrors.email} />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Mobile Number <span className="text-blue-500">*</span></label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          Mobile Number <span className="text-blue-500">*</span>
+                        </label>
                         <div className="relative">
                           <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                          <input type="tel" value={form.mobileNumber}
-                            onChange={e => { const v = e.target.value.replace(/\D/g,"").slice(0,10); setField("mobileNumber",v); clearFE("mobileNumber"); }}
+                          <input
+                            type="tel"
+                            ref={refs.mobileNumber}
+                            value={form.mobileNumber}
+                            onChange={e => {
+                              const v = e.target.value.replace(/\D/g, "").slice(0, 10);
+                              setField("mobileNumber", v);
+                              clearFE("mobileNumber");
+                            }}
                             className={`${inputBase} pl-10 pr-3 ${formErrors.mobileNumber ? inputErr : ""}`}
-                            placeholder="10-digit mobile number" />
+                            placeholder="10-digit mobile number"
+                          />
                         </div>
                         <FieldError msg={formErrors.mobileNumber} />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Date of Birth <span className="text-blue-500">*</span></label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          Date of Birth <span className="text-blue-500">*</span>
+                        </label>
                         <div className="relative">
                           <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                          <input type="date" value={form.dateOfBirth}
+                          <input
+                            type="date"
+                            ref={refs.dateOfBirth}
+                            value={form.dateOfBirth}
                             onChange={e => { setField("dateOfBirth", e.target.value); clearFE("dateOfBirth"); }}
                             max={new Date().toISOString().split("T")[0]}
-                            className={`${inputBase} pl-10 pr-3 ${formErrors.dateOfBirth ? inputErr : ""}`} />
+                            className={`${inputBase} pl-10 pr-3 ${formErrors.dateOfBirth ? inputErr : ""}`}
+                          />
                         </div>
                         <FieldError msg={formErrors.dateOfBirth} />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Gender <span className="text-blue-500">*</span></label>
-                        <select value={form.gender}
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          Gender <span className="text-blue-500">*</span>
+                        </label>
+                        <select
+                          ref={refs.gender}
+                          value={form.gender}
                           onChange={e => { setField("gender", e.target.value); clearFE("gender"); }}
-                          className={`${inputBase} px-3 appearance-none ${formErrors.gender ? inputErr : ""}`}>
+                          className={`${inputBase} px-3 appearance-none ${formErrors.gender ? inputErr : ""}`}
+                        >
                           <option value="">Select Gender</option>
-                          <option>Male</option><option>Female</option><option>Other</option>
+                          <option>Male</option>
+                          <option>Female</option>
+                          <option>Other</option>
                         </select>
                         <FieldError msg={formErrors.gender} />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Aadhaar Number <span className="text-blue-500">*</span></label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          Aadhaar Number <span className="text-blue-500">*</span>
+                        </label>
                         <div className="relative">
                           <IdCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                          <input type="text" value={form.aadhaarNumber}
-                            onChange={e => { const v = e.target.value.replace(/\D/g,"").slice(0,12); setField("aadhaarNumber",v); clearFE("aadhaarNumber"); }}
+                          <input
+                            type="text"
+                            ref={refs.aadhaarNumber}
+                            value={form.aadhaarNumber}
+                            onChange={e => {
+                              const v = e.target.value.replace(/\D/g, "").slice(0, 12);
+                              setField("aadhaarNumber", v);
+                              clearFE("aadhaarNumber");
+                            }}
                             className={`${inputBase} pl-10 pr-3 ${formErrors.aadhaarNumber ? inputErr : ""}`}
-                            placeholder="12-digit Aadhaar" />
+                            placeholder="12-digit Aadhaar"
+                          />
                         </div>
                         <FieldError msg={formErrors.aadhaarNumber} />
                       </div>
@@ -455,10 +683,13 @@ localStorage.setItem("citizen_user", JSON.stringify({
                         <label className="block text-sm font-bold text-slate-700 mb-1.5">Occupation</label>
                         <div className="relative">
                           <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                          <input type="text" value={form.occupation}
+                          <input
+                            type="text"
+                            value={form.occupation}
                             onChange={e => setField("occupation", e.target.value)}
                             className={`${inputBase} pl-10 pr-3`}
-                            placeholder="e.g., Business, Service" />
+                            placeholder="e.g., Business, Service"
+                          />
                         </div>
                       </div>
                     </div>
@@ -468,7 +699,6 @@ localStorage.setItem("citizen_user", JSON.stringify({
                   <section>
                     <SectionHead icon={Home} label="Residential Address" />
 
-                    {/* Mode toggle */}
                     <div className="flex gap-2 mb-4">
                       <button type="button"
                         onClick={() => setAddrFetched(false)}
@@ -484,48 +714,81 @@ localStorage.setItem("citizen_user", JSON.stringify({
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="md:col-span-2">
-                       <label className="block text-sm font-bold text-slate-700 mb-1.5">Full Address <span className="text-blue-500">*</span></label>
-                        <textarea value={form.address} rows="2"
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          Full Address <span className="text-blue-500">*</span>
+                        </label>
+                        <textarea
+                          ref={refs.address}
+                          value={form.address}
+                          rows="2"
                           onChange={e => { setField("address", e.target.value); clearFE("address"); setAddrFetched(false); }}
                           className={`w-full px-3 py-2.5 rounded-xl border bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none text-slate-900 placeholder-slate-400 transition-all text-sm shadow-sm resize-none ${formErrors.address ? "border-red-400" : "border-slate-200"}`}
-                          placeholder="House/Flat No., Street, Area, Locality" />
+                          placeholder="House/Flat No., Street, Area, Locality"
+                        />
                         <FieldError msg={formErrors.address} />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">City <span className="text-blue-500">*</span></label>
-                        <input type="text" value={form.city}
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          City <span className="text-blue-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          ref={refs.city}
+                          value={form.city}
                           onChange={e => { setField("city", e.target.value); clearFE("city"); }}
                           className={`${inputBase} px-3 ${formErrors.city ? inputErr : ""}`}
-                          placeholder="City" />
+                          placeholder="City"
+                        />
                         <FieldError msg={formErrors.city} />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">District <span className="text-blue-500">*</span></label>
-                        <input type="text" value={form.district}
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          District <span className="text-blue-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          ref={refs.district}
+                          value={form.district}
                           onChange={e => { setField("district", e.target.value); clearFE("district"); }}
                           className={`${inputBase} px-3 ${formErrors.district ? inputErr : ""}`}
-                          placeholder="District" />
+                          placeholder="District"
+                        />
                         <FieldError msg={formErrors.district} />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">State <span className="text-blue-500">*</span></label>
-                        <select value={form.state} onChange={e => setField("state", e.target.value)}
-                          className={`${inputBase} px-3 appearance-none`}>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          State <span className="text-blue-500">*</span>
+                        </label>
+                        <select
+                          value={form.state}
+                          onChange={e => setField("state", e.target.value)}
+                          className={`${inputBase} px-3 appearance-none`}
+                        >
                           {INDIAN_STATES.map(s => <option key={s}>{s}</option>)}
                         </select>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Pincode <span className="text-blue-500">*</span></label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          Pincode <span className="text-blue-500">*</span>
+                        </label>
                         <div className="relative">
                           <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                          <input type="text" value={form.pincode}
-                            onChange={e => { const v = e.target.value.replace(/\D/g,"").slice(0,6); setField("pincode",v); clearFE("pincode"); }}
+                          <input
+                            type="text"
+                            ref={refs.pincode}
+                            value={form.pincode}
+                            onChange={e => {
+                              const v = e.target.value.replace(/\D/g, "").slice(0, 6);
+                              setField("pincode", v);
+                              clearFE("pincode");
+                            }}
                             className={`${inputBase} pl-10 pr-3 ${formErrors.pincode ? inputErr : ""}`}
-                            placeholder="6-digit pincode" />
+                            placeholder="6-digit pincode"
+                          />
                         </div>
                         <FieldError msg={formErrors.pincode} />
                       </div>
@@ -537,14 +800,25 @@ localStorage.setItem("citizen_user", JSON.stringify({
                     <SectionHead icon={Lock} label="Account Security" />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Password <span className="text-blue-500">*</span></label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          Password <span className="text-blue-500">*</span>
+                        </label>
                         <div className="relative">
                           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                          <input type={showPw ? "text" : "password"} autoComplete="new-password" value={form.password}
-                            onChange={e => { setField("password", e.target.value); clearFE("password"); clearFE("confirmPassword"); }}
+                          <input
+                            type={showPw ? "text" : "password"}
+                            ref={refs.password}
+                            autoComplete="new-password"
+                            value={form.password}
+                            onChange={e => {
+                              setField("password", e.target.value);
+                              clearFE("password");
+                              clearFE("confirmPassword");
+                            }}
                             className={`${inputBase} pl-10 pr-10 ${formErrors.password ? inputErr : ""}`}
-                            placeholder="Minimum 8 characters" />
-                          <button type="button" onClick={() => setShowPw(p=>!p)}
+                            placeholder="Minimum 8 characters"
+                          />
+                          <button type="button" onClick={() => setShowPw(p => !p)}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
                             {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
@@ -553,14 +827,21 @@ localStorage.setItem("citizen_user", JSON.stringify({
                       </div>
 
                       <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Confirm Password <span className="text-blue-500">*</span></label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          Confirm Password <span className="text-blue-500">*</span>
+                        </label>
                         <div className="relative">
                           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                          <input type={showCPw ? "text" : "password"} autoComplete="new-password" value={form.confirmPassword}
+                          <input
+                            type={showCPw ? "text" : "password"}
+                            ref={refs.confirmPassword}
+                            autoComplete="new-password"
+                            value={form.confirmPassword}
                             onChange={e => { setField("confirmPassword", e.target.value); clearFE("confirmPassword"); }}
                             className={`${inputBase} pl-10 pr-10 ${formErrors.confirmPassword ? inputErr : ""}`}
-                            placeholder="Re-enter password" />
-                          <button type="button" onClick={() => setShowCPw(p=>!p)}
+                            placeholder="Re-enter password"
+                          />
+                          <button type="button" onClick={() => setShowCPw(p => !p)}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
                             {showCPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
@@ -583,18 +864,20 @@ localStorage.setItem("citizen_user", JSON.stringify({
                     <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
                     {loading
                       ? <><Loader2 className="w-5 h-5 animate-spin" /><span>Sending OTP...</span></>
-                      : <><span>Register & Continue</span><ArrowRight className="w-4 h-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" /></>}
+                      : <><span>Register &amp; Continue</span><ArrowRight className="w-4 h-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" /></>}
                   </button>
 
                   <p className="text-center text-sm text-slate-500">
                     Already have an account?{" "}
                     <button type="button" onClick={() => setView("login")}
-                      className="text-blue-600 font-bold hover:text-blue-700 transition-colors">Sign In Here</button>
+                      className="text-blue-600 font-bold hover:text-blue-700 transition-colors">
+                      Sign In Here
+                    </button>
                   </p>
                 </form>
               )}
 
-              {/* ────────── OTP ────────── */}
+              {/* ── OTP ── */}
               {view === "otp" && (
                 <form onSubmit={handleVerifyOtp} autoComplete="off" className="space-y-6" noValidate>
                   <div className="text-center">
@@ -604,9 +887,9 @@ localStorage.setItem("citizen_user", JSON.stringify({
                         <Mail className="w-9 h-9 text-blue-600" />
                       </div>
                     </div>
-                    <h3 className="text-xl font-black text-slate-900 mb-2">Check Your Phone</h3>
+                    <h3 className="text-xl font-black text-slate-900 mb-2">Check Your Email</h3>
                     <p className="text-slate-500 text-sm leading-relaxed">
-                      We've sent a 6-digit code to<br />
+                      We&apos;ve sent a 6-digit code to<br />
                       <span className="font-bold text-slate-900">{tempUser?.email}</span>
                     </p>
                   </div>
@@ -617,11 +900,18 @@ localStorage.setItem("citizen_user", JSON.stringify({
                     </label>
                     <div className="flex justify-center gap-2 sm:gap-3">
                       {otp.map((d, i) => (
-                        <input key={i} id={`otp-${i}`} type="text" maxLength="1" autoComplete="off"
+                        <input
+                          key={i}
+                          id={`otp-${i}`}
+                          type="text"
+                          inputMode="numeric"
+                          maxLength="1"
+                          autoComplete="off"
                           value={d}
                           onChange={e => { handleOtpChange(i, e.target.value); clearFE("otp"); }}
                           onKeyDown={e => handleOtpKey(i, e)}
-                          className={`w-11 h-14 text-center text-xl font-black border-2 rounded-xl bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none transition-all shadow-sm ${formErrors.otp ? "border-red-400" : "border-slate-200"}`} />
+                          className={`w-11 h-14 text-center text-xl font-black border-2 rounded-xl bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none transition-all shadow-sm ${formErrors.otp ? "border-red-400" : "border-slate-200"}`}
+                        />
                       ))}
                     </div>
                     <div className="text-center mt-1"><FieldError msg={formErrors.otp} /></div>
@@ -629,8 +919,13 @@ localStorage.setItem("citizen_user", JSON.stringify({
 
                   <div className="text-center">
                     {canResend
-                      ? <button type="button" onClick={handleResendOtp} className="text-blue-600 font-bold hover:text-blue-700 transition-colors text-sm">Resend Code</button>
-                      : <p className="text-sm text-slate-500">Resend code in <span className="font-bold text-blue-600">{resendTimer}s</span></p>}
+                      ? <button type="button" onClick={handleResendOtp}
+                          className="text-blue-600 font-bold hover:text-blue-700 transition-colors text-sm">
+                          Resend Code
+                        </button>
+                      : <p className="text-sm text-slate-500">
+                          Resend code in <span className="font-bold text-blue-600">{resendTimer}s</span>
+                        </p>}
                   </div>
 
                   <button type="submit" disabled={otpLoading}
@@ -638,7 +933,7 @@ localStorage.setItem("citizen_user", JSON.stringify({
                     <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
                     {otpLoading
                       ? <><Loader2 className="w-5 h-5 animate-spin" /><span>Verifying...</span></>
-                      : <><CheckCircle2 className="w-4 h-4" /><span>Verify & Create Account</span></>}
+                      : <><CheckCircle2 className="w-4 h-4" /><span>Verify &amp; Create Account</span></>}
                   </button>
 
                   <div className="text-center">
