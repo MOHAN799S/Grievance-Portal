@@ -494,7 +494,7 @@ export default function CitizenLogin() {
 
               {/* ── LOGIN ── */}
               {view === "login" && (
-                <form onSubmit={handleLogin} autoComplete="off" className="space-y-4" noValidate>
+                <form onSubmit={handleLogin}  className="space-y-4" noValidate>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1.5">
                       Email Address <span className="text-blue-500">*</span>
@@ -503,7 +503,7 @@ export default function CitizenLogin() {
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                       <input
                         type="email"
-                        autoComplete="off"
+                        autoComplete="new-email"
                         value={loginEmail}
                         onChange={e => { setLoginEmail(e.target.value); clearLE("email"); }}
                         className={`${inputBase} pl-10 pr-3 ${loginErrors.email ? inputErr : ""}`}
@@ -521,7 +521,7 @@ export default function CitizenLogin() {
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                       <input
                         type={showLPw ? "text" : "password"}
-                        autoComplete="off"
+                        autoComplete="new-password"
                         value={loginPassword}
                         onChange={e => { setLoginPassword(e.target.value); clearLE("password"); }}
                         className={`${inputBase} pl-10 pr-10 ${loginErrors.password ? inputErr : ""}`}
@@ -910,6 +910,7 @@ export default function CitizenLogin() {
                           value={d}
                           onChange={e => { handleOtpChange(i, e.target.value); clearFE("otp"); }}
                           onKeyDown={e => handleOtpKey(i, e)}
+                    
                           className={`w-11 h-14 text-center text-xl font-black border-2 rounded-xl bg-white text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none transition-all shadow-sm ${formErrors.otp ? "border-red-400" : "border-slate-200"}`}
                         />
                       ))}

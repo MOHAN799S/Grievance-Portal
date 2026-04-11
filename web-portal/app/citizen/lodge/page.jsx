@@ -397,13 +397,13 @@ function SuccessScreen({ successData, prediction, onReset }) {
         </div>
 
         {/* Reference ID */}
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-lg p-6 mb-6 text-center">
+        {/* <div className="bg-white rounded-3xl border border-slate-100 shadow-lg p-6 mb-6 text-center">
           <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">Reference ID</p>
           <p className="text-2xl font-mono font-bold text-blue-600 mb-3">
             KMC-{successData._id.slice(-8).toUpperCase()}
           </p>
           <p className="text-sm text-slate-600">Save this ID to track your grievance status</p>
-        </div>
+        </div> */}
 
         {/* Grievance Details */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-lg p-6 mb-6">
@@ -510,7 +510,6 @@ function AuthGate() {
           <Shield className="w-8 h-8 text-blue-600" />
         </div>
         <h1 className="text-3xl font-bold text-slate-900 mb-2">CivicConnect</h1>
-        <p className="text-slate-600 mb-8">Municipal Corp</p>
         <div className="bg-white rounded-2xl border border-slate-100 shadow-lg p-8 mb-6">
           <h2 className="font-bold text-lg text-slate-900 mb-3">Sign In Required</h2>
           <p className="text-sm text-slate-600">Only registered citizens can lodge grievances. Please sign in to continue.</p>

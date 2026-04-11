@@ -124,7 +124,7 @@ export default function AdminLogin() {
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleLogin} className="space-y-6" autoComplete="off" >
 
             {/* EMAIL */}
             <div>
@@ -137,9 +137,10 @@ export default function AdminLogin() {
                   type="email"
                   required
                   placeholder="admin@kakinada.gov.in"
+                  autoComplete="new-email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border text-black border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
                 />
               </div>
             </div>
@@ -154,13 +155,14 @@ export default function AdminLogin() {
                 <input
                   type={showPw ? "text" : "password"}
                   required
+                  autoComplete="new-password"
                   value={password}
                   placeholder="Enter password"
                   onChange={(e) => setPassword(e.target.value)}
                   onKeyUp={(e) =>
                     setCapsWarning(e.getModifierState("CapsLock"))
                   }
-                  className="w-full pl-10 pr-12 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                  className="w-full pl-10 pr-12 py-3 text-black rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
                 />
                 <button
                   type="button"
