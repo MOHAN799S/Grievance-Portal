@@ -5,8 +5,7 @@
 
 [![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-grievance--portal--one.vercel.app-00C7B7?style=for-the-badge)](https://grievance-portal-one.vercel.app/)
 [![GitHub Repo](https://img.shields.io/badge/GitHub-MOHAN799S%2FGrievance--Portal-181717?style=for-the-badge&logo=github)](https://github.com/MOHAN799S/Grievance-Portal)
-[![ML on HuggingFace](https://img.shields.io/badge/🤗_ML_Model-Hugging_Face-FFD21E?style=for-the-badge)](https://huggingface.co/)
-[![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
+[![ML on HuggingFace](https://img.shields.io/badge/🤗_ML_Model-Hugging_Face-FFD21E?style=for-the-badge)](https://huggingface.co/spaces/mohanbot799s/civicconnect-ai-engine)
 [![Made With](https://img.shields.io/badge/Made_with-❤️_in_India-orange?style=for-the-badge)](https://github.com/MOHAN799S/Grievance-Portal)
 
 <br/>
@@ -14,7 +13,7 @@
 > **An intelligent, AI-powered platform that bridges the gap between citizens and government — making grievance redressal faster, transparent, and accessible to all.**
 
 > 📌 **This repository contains the Frontend (Next.js) and Backend (Node.js) of Civic Connect.**
-> The ML/AI Classification Model is separately deployed on 🤗 Hugging Face → [View ML Model](https://huggingface.co/)
+> The ML/AI Classification Model is separately deployed on 🤗 Hugging Face → [View ML Model](https://huggingface.co/spaces/mohanbot799s/civicconnect-ai-engine)
 
 <br/>
 
@@ -38,6 +37,7 @@
 - [🔬 Testing](#-testing)
 - [🔮 Future Scope](#-future-scope)
 - [👥 Team](#-team)
+- [📄 Publication](#-publication)
 - [🙏 Acknowledgements](#-acknowledgements)
 - [📚 References](#-references)
 
@@ -67,7 +67,7 @@ The system is an **AI-powered, multimodal grievance redressal platform** that in
 | Part | Repository | Deployed On |
 |------|-----------|-------------|
 | 🖥️ **Frontend + Backend** | [MOHAN799S/Grievance-Portal](https://github.com/MOHAN799S/Grievance-Portal) ← **You are here** | Vercel |
-| 🤗 **ML / AI Classification Model** | Hugging Face Space | [Hugging Face 🤗](https://huggingface.co/) |
+| 🤗 **ML / AI Classification Model** | Hugging Face Space | [Hugging Face 🤗](https://huggingface.co/spaces/mohanbot799s/civicconnect-ai-engine) |
 
 The **Frontend** (Next.js) communicates with the **Backend** (Node.js/Express), which calls the **ML API** hosted on Hugging Face to classify and prioritize grievances in real time.
 
@@ -268,7 +268,7 @@ Grievance-Portal/                  ← You are here
 └── README.md
 ```
 
-> 🤗 **ML Repo (Separate):** BERT model training, Flask/FastAPI inference, SHAP explainability → [Hugging Face Space](https://huggingface.co/)
+> 🤗 **ML Repo (Separate):** BERT model training, Flask/FastAPI inference, SHAP explainability → [Hugging Face Space](https://huggingface.co/spaces/mohanbot799s/civicconnect-ai-engine)
 
 ---
 
@@ -326,7 +326,7 @@ App runs at **http://localhost:3000**
 > It is deployed as an API on 🤗 Hugging Face Spaces.
 > Simply add your Hugging Face Space URL to `HUGGINGFACE_API_URL` in the `.env` file above.
 >
-> 👉 [View ML Model on Hugging Face](https://huggingface.co/)
+> 👉 [View ML Model on Hugging Face](https://huggingface.co/spaces/mohanbot799s/civicconnect-ai-engine)
 
 ---
 
@@ -396,6 +396,18 @@ App runs at **http://localhost:3000**
 **Head of Department:** Dr. G. S. N. Murthy M.Tech Ph.D
 **Institution:** Aditya College of Engineering & Technology (A), Surampalem
 
+
+---
+## 📄 Publication
+
+This project was accepted and published as a peer-reviewed research article:
+
+> **S. Mohan Lakshman, A. Alekhya, K. Pardhasaradhi, D. J. Phani Srinivas, S. Chittibabulu**
+> *"Multimodal artificial intelligence priorities and analysis portal in citizen services"*
+> International Journal of Science and Research Archive (IJSRA), Vol. 18, Issue 3, pp. 645–651, 2026
+> **DOI:** [10.30574/ijsra.2026.18.3.0473](https://doi.org/10.30574/ijsra.2026.18.3.0473)
+> **Received:** 29 January 2026 · **Revised:** 07 March 2026 · **Accepted:** 09 March 2026
+
 ---
 
 ## 🙏 Acknowledgements
@@ -431,6 +443,6 @@ App runs at **http://localhost:3000**
 
 Made with ❤️ by Team Civic Connect | Aditya College of Engineering & Technology (A)
 
-🌐 [Live Demo](https://grievance-portal-one.vercel.app/) • 💻 [GitHub](https://github.com/MOHAN799S/Grievance-Portal) • 🤗 [ML Model on Hugging Face](https://huggingface.co/)
+🌐 [Live Demo](https://grievance-portal-one.vercel.app/) • 💻 [GitHub](https://github.com/MOHAN799S/Grievance-Portal) • 🤗 [ML Model on Hugging Face](https://huggingface.co/spaces/mohanbot799s/civicconnect-ai-engine)
 
 </div>
