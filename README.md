@@ -197,17 +197,8 @@ Citizen Submits Complaint (Text + Geo-Photo + Voice)
 
 ### Grievance Categories Supported
 
-| Category | Priority Level |
-|----------|---------------|
-| 🔥 Fire / Accident | Immediate |
-| 💧 Water Supply | High |
-| ⚡ Electricity | High |
-| 🏥 Health | High |
-| 🛣️ Roads | Medium |
-| 🗑️ Sanitation | Medium |
-| 🌳 Environment | Medium |
-| 🏗️ Infrastructure | Medium |
-
+Supported Categories (8):
+Water Supply · Roads · Sanitation · Electricity · Garbage · Pollution · Public Transport · Stray Animals
 ---
 
 ## ⚙️ Tech Stack
