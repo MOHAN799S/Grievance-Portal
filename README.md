@@ -1,448 +1,619 @@
 <div align="center">
 
+<img src="https://img.shields.io/badge/Status-Published%20Research-brightgreen?style=for-the-badge" />
+
 # 🏛️ Civic Connect
 ### AI-Based Public Grievance Analysis & Prioritization System
 
-[![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-grievance--portal--one.vercel.app-00C7B7?style=for-the-badge)](https://grievance-portal-one.vercel.app/)
-[![GitHub Repo](https://img.shields.io/badge/GitHub-MOHAN799S%2FGrievance--Portal-181717?style=for-the-badge&logo=github)](https://github.com/MOHAN799S/Grievance-Portal)
-[![ML on HuggingFace](https://img.shields.io/badge/🤗_ML_Model-Hugging_Face-FFD21E?style=for-the-badge)](https://huggingface.co/spaces/mohanbot799s/civicconnect-ai-engine)
-[![Made With](https://img.shields.io/badge/Made_with-❤️_in_India-orange?style=for-the-badge)](https://github.com/MOHAN799S/Grievance-Portal)
+[![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-Express-green?style=for-the-badge&logo=node.js)](https://nodejs.org/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-NoSQL-brightgreen?style=for-the-badge&logo=mongodb)](https://mongodb.com/)
+[![Python](https://img.shields.io/badge/Python-3.10-blue?style=for-the-badge&logo=python)](https://python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-BERT-EE4C2C?style=for-the-badge&logo=pytorch)](https://pytorch.org/)
+[![HuggingFace](https://img.shields.io/badge/🤗%20HuggingFace-Deployed-yellow?style=for-the-badge)](https://mohanbot799s-civicconnect-ai-engine.hf.space)
+[![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
-<br/>
+**📄 Peer-Reviewed Publication · IJSRA Vol.18, Issue 3, 2026**
+**DOI: [10.30574/ijsra.2026.18.3.0473](https://doi.org/10.30574/ijsra.2026.18.3.0473)**
 
-> **An intelligent, AI-powered platform that bridges the gap between citizens and government — making grievance redressal faster, transparent, and accessible to all.**
+*B.Tech Final-Year Capstone · Aditya College of Engineering & Technology (2022–2026)*
 
-> 📌 **This repository contains the Frontend (Next.js) and Backend (Node.js) of Civic Connect.**
-> The ML/AI Classification Model is separately deployed on 🤗 Hugging Face → [View ML Model](https://huggingface.co/spaces/mohanbot799s/civicconnect-ai-engine)
-
-<br/>
-
-![---------------------------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png)
+[🌐 Live Demo](https://grievance-portal-one.vercel.app/) · [🤖 AI Engine](https://mohanbot799s-civicconnect-ai-engine.hf.space) · [📄 Research Paper](https://doi.org/10.30574/ijsra.2026.18.3.0473) · [🐛 Report Bug](https://github.com/MOHAN799S/grievance-portal/issues)
 
 </div>
 
-## 📋 Table of Contents
+---
 
-- [🎯 About the Project](#-about-the-project)
-- [🗂️ Repository Structure](#️-repository-structure)
-- [🚨 The Problem](#-the-problem)
-- [💡 Our Solution](#-our-solution)
-- [✨ Key Features](#-key-features)
-- [🏗️ System Architecture](#️-system-architecture)
-- [🧠 How the AI Works](#-how-the-ai-works)
-- [⚙️ Tech Stack](#️-tech-stack)
-- [📁 Project Structure](#-project-structure)
-- [🚀 Getting Started](#-getting-started)
-- [📊 Performance & Results](#-performance--results)
-- [🔬 Testing](#-testing)
-- [🔮 Future Scope](#-future-scope)
-- [👥 Team](#-team)
-- [📄 Publication](#-publication)
-- [🙏 Acknowledgements](#-acknowledgements)
-- [📚 References](#-references)
+## 📌 Table of Contents
+
+- [About the Project](#-about-the-project)
+- [Key Innovations](#-key-innovations)
+- [Repository Structure](#-repository-structure)
+- [System Architecture](#-system-architecture)
+- [Features](#-features)
+- [Tech Stack](#-tech-stack)
+- [AI Engine (Hugging Face)](#-ai-engine-hugging-face)
+- [AI Classification Modules](#-ai-classification-modules)
+- [Database Design](#-database-design)
+- [Getting Started](#-getting-started)
+- [API Reference](#-api-reference)
+- [Testing & Results](#-testing--results)
+- [Performance Metrics](#-performance-metrics)
+- [Limitations](#-limitations)
+- [Future Scope](#-future-scope)
+- [Team](#-team)
+- [Publication](#-publication)
+- [License](#-license)
 
 ---
 
-## 🎯 About the Project
+## 🔍 About the Project
 
-**Civic Connect** is a final year B.Tech project developed at **Aditya College of Engineering & Technology (A)**, Department of Computer Science & Engineering, affiliated to JNTUK.
+Traditional government grievance portals like **CPGRAMS** rely on manual classification across 91+ departments and 15,000+ categories — leading to mis-routing, resolution delays, and poor prioritization. Citizens filing complaints in regional languages are often ignored entirely.
 
-The system is an **AI-powered, multimodal grievance redressal platform** that integrates advanced Natural Language Processing (NLP), Machine Learning (ML), and Explainable AI (XAI) to automate and improve public complaint handling in e-governance.
+**Civic Connect** is a full-stack, AI-powered platform that automates the entire grievance lifecycle — from multilingual submission to intelligent classification, geo-verified evidence collection, fairness auditing, and transparent admin resolution.
 
-| Field | Details |
-|-------|---------|
-| 🎓 Degree | Bachelor of Technology — Computer Science & Engineering |
-| 🏫 Institution | Aditya College of Engineering & Technology (A), Surampalem |
-| 📅 Academic Year | 2022–2026 |
-| 👨‍🏫 Guide | Mr. S. Chittibabulu M.Tech (Ph.D), Associate Professor |
-| 🌐 Live Demo | [grievance-portal-one.vercel.app](https://grievance-portal-one.vercel.app/) |
-| 🤗 ML Model | Deployed separately on Hugging Face |
+> This project consists of **two separate deployments**:
+> - **`grievance-portal`** — Full-stack web application (Next.js frontend + Node.js/Express backend)
+> - **`civicconnect-ai-engine`** — Python AI microservice deployed on Hugging Face Spaces
+
+> Published as a peer-reviewed research article in the *International Journal of Science and Research Archive* (IJSRA), 2026.
 
 ---
 
-## 🗂️ Repository Structure
+## 💡 Key Innovations
 
-> ⚠️ **This project is split across two separate repositories**
+| Innovation | Description |
+|---|---|
+| **Token-Free Citizen Submission** | Citizens submit grievances without mandatory registration — removing barriers for low-literacy users |
+| **Dual BERT Classification** | Separate fine-tuned models for English (`bert-base-uncased`) and Indic languages (`IndicBERT`) — classifies into 8 departments with 85–92% accuracy |
+| **Urgency Sentiment Model** | Dedicated BERT-based urgency classifier (separate from category) for both English and Indic inputs |
+| **Geo-Tagged Evidence (Geo-Camera)** | GPS coordinates, street address, and timestamp burned directly onto evidence photos — preventing fraudulent or backdated submissions |
+| **Explainable Prioritization (X-PE)** | Priority assigned with SHAP + Integrated Gradients explanations — not just keyword matching |
+| **Fairness Audit System (GFAS)** | Monitors classification bias across geographic regions and language groups — flags disparity in real time |
+| **Multimodal Input** | Accepts text, geo-tagged images, and voice notes — processed through a unified NLP pipeline |
+| **Dual-Access Security** | Open citizen portal + JWT-protected admin dashboard with strict privilege separation |
 
-| Part | Repository | Deployed On |
-|------|-----------|-------------|
-| 🖥️ **Frontend + Backend** | [MOHAN799S/Grievance-Portal](https://github.com/MOHAN799S/Grievance-Portal) ← **You are here** | Vercel |
-| 🤗 **ML / AI Classification Model** | Hugging Face Space | [Hugging Face 🤗](https://huggingface.co/spaces/mohanbot799s/civicconnect-ai-engine) |
+---
 
-The **Frontend** (Next.js) communicates with the **Backend** (Node.js/Express), which calls the **ML API** hosted on Hugging Face to classify and prioritize grievances in real time.
+## 📁 Repository Structure
+
+This project is split across **two repositories / deployment targets**:
 
 ```
-[Next.js Frontend]  →  [Node.js Backend]  →  [🤗 Hugging Face ML API]
-     Vercel               This Repo              Separate HF Space
+📦 grievance-portal/              ← This repo (GitHub)
+├── 📁 server/                    ← Node.js + Express REST API
+│   ├── 📁 config/
+│   │   └── resend.js             # Email service config
+│   ├── 📁 models/
+│   │   ├── Grievance.js          # Grievance schema
+│   │   ├── HotspotAlert.js       # Hotspot alert schema
+│   │   ├── Otp.js                # OTP verification schema
+│   │   └── User.js               # User schema (citizen + admin)
+│   ├── 📁 routes/
+│   │   └── auth.routes.js        # Auth API routes
+│   └── index.js                  # Main server entry point
+│
+└── 📁 web-portal/                ← Next.js 14 Frontend
+    ├── 📁 app/
+    │   ├── 📁 admin/
+    │   │   ├── dashboard/page.jsx # Admin grievance dashboard
+    │   │   └── login/page.jsx     # Admin login
+    │   ├── 📁 citizen/
+    │   │   ├── history/page.jsx   # Citizen complaint tracking
+    │   │   ├── lodge/page.jsx     # Grievance submission (Geo-Camera)
+    │   │   └── login/page.jsx     # Citizen login
+    │   ├── layout.jsx
+    │   └── page.jsx               # Landing page
+    ├── 📁 components/
+    │   └── GrievanceMap.jsx       # Live complaint heatmap
+    ├── 📁 hooks/
+    │   └── useAuth.js
+    └── 📁 lib/
+        └── auth.js
 ```
 
----
-
-## 🚨 The Problem
-
-Traditional grievance redressal systems like **CPGRAMS** handle complaints across 91+ departments and 15,000+ categories but suffer from critical limitations:
-
-| Issue | Impact |
-|-------|--------|
-| ❌ Manual Classification | Slow processing, human errors, misrouting |
-| ❌ No Priority Detection | Urgent cases treated same as non-urgent |
-| ❌ Zero Transparency | Citizens have no visibility into complaint status |
-| ❌ Language Barrier | Limited support for regional Indian languages |
-| ❌ No Accountability | No mechanism to ensure timely resolution |
-| ❌ No Analytics | No predictive insights or real-time reporting |
-
----
-
-## 💡 Our Solution
-
-**Civic Connect** automates the entire grievance lifecycle using AI:
-
-```
-Citizen Submits Complaint (Text + Geo-Photo + Voice)
-                    ↓
-         Pre-processing (NLP Cleaning)
-                    ↓
-     🤗 BERT Classification API (Hugging Face)
-                    ↓
-       Priority Scoring → High / Medium / Low
-                    ↓
-        Auto-Routing to Correct Department
-                    ↓
-     Admin Dashboard + Citizen Notifications
-                    ↓
-        Resolution + Feedback Loop (Retraining)
-```
-
----
-
-## ✨ Key Features
-
-### 👤 For Citizens
-- **🔓 Token-Free Access** — No mandatory registration. Submit grievances with just name and area.
-- **📸 Geo-Tagged Evidence** — Photos captured with GPS coordinates, address & timestamp embedded directly onto the image.
-- **🎙️ Voice Notes** — Submit audio complaints via microphone.
-- **📍 Real-Time GPS** — OpenStreetMap reverse-geocoding converts coordinates to readable addresses automatically.
-- **🔔 Status Tracking** — Unique tracking ID + email/SMS status updates.
-
-### 🤖 For the AI Engine (Hosted on 🤗 Hugging Face)
-- **🧠 BERT Classification** — Fine-tuned `bert-base-uncased` model categorizes complaints into 8 departments with **85–90% accuracy**.
-- **⚡ Fast Prediction** — AI responds in **~0.4 seconds** per query.
-- **📊 Priority Assignment** — Severity-based tagging: `Immediate` / `High` / `Medium` / `Low`.
-- **🔍 Explainable AI (XAI)** — SHAP-based rationales explain every priority decision transparently.
-- **♻️ Feedback Loop** — Post-resolution ratings continuously improve the model.
-
-### 🖥️ For Administrators
-- **📡 Live Heatmap** — Visualize complaint hotspots across geography in real time.
-- **🗂️ Smart Filters** — Sort grievances by category, priority, date, and status.
-- **🚫 Spam Filtering** — One-click to move irrelevant reports to spam folder.
-- **✅ One-Click Resolve** — Resolve complaints and auto-notify citizens instantly.
-- **📈 Analytics Dashboard** — Charts and metrics on department performance and resolution trends.
-
-### 🔒 Security
-- **JWT Authentication** — Secure admin portal with JSON Web Token-based login.
-- **Encrypted Storage** — Sensitive data encrypted at rest in MongoDB.
-- **Role-Based Access** — Separate citizen and admin access levels.
-- **Cloud-Scalable** — Cloudinary for media, scalable to thousands of complaints.
+> **AI Microservice** is maintained separately and deployed on Hugging Face Spaces.
+> See [AI Engine](#-ai-engine-hugging-face) section below.
 
 ---
 
 ## 🏗️ System Architecture
 
+The platform follows a **three-tier architecture** with a decoupled AI microservice:
+
 ```
-┌─────────────────────────────────────────────────────────┐
-│                  PRESENTATION LAYER                     │
-│         Next.js 14 Web Portal (Vercel)                  │
-│      Citizen Interface  |  Admin Dashboard              │
-└──────────────────────┬──────────────────────────────────┘
-                       │ REST APIs
-┌──────────────────────▼──────────────────────────────────┐
-│                  APPLICATION LAYER                      │
-│                                                         │
-│         Node.js / Express.js Backend                    │
-│         JWT Auth | Multer | Cloudinary                  │
-│                       │                                 │
-│                       │ HTTP API Call                   │
-│                       ▼                                 │
-│        🤗 Hugging Face ML API (External)                │
-│         BERT Classification + Priority Scoring          │
-│              SHAP Explainable AI                        │
-└──────────────────────┬──────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────┐
-│                    DATA LAYER                           │
-│       MongoDB (NoSQL)  |  Cloudinary (Media)            │
-│   Users | Grievances | Departments | Notifications      │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        CITIZEN INTERFACE                         │
+│   Smart Lodge Form │ Geo-Camera Module │ Voice Note Input        │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ HTTPS / REST API
+┌──────────────────────────▼──────────────────────────────────────┐
+│                    BACKEND (Node.js / Express)                   │
+│  Auth Controller (JWT) │ Grievance Controller │ File Handler     │
+│  Multer Upload  │  Cloudinary Storage  │  AI Connector           │
+└──────────┬──────────────────────────────────────┬───────────────┘
+           │                                      │
+┌──────────▼───────────┐      ┌───────────────────▼───────────────┐
+│   MongoDB Database   │      │  Python AI Microservice (HF Space) │
+│  Users / Grievances  │      │  ├── BERT Classification (EN/Indic)│
+│  Departments / Logs  │      │  ├── Urgency Sentiment Model       │
+│  HotspotAlerts       │      │  ├── X-PE Explainability (SHAP)    │
+└──────────────────────┘      │  ├── GFAS Fairness Audit           │
+                              │  └── Multimodal (Audio + Image)    │
+                              └───────────────────────────────────┘
+                                              │
+                              ┌───────────────▼───────────────────┐
+                              │         ADMIN DASHBOARD            │
+                              │  Live Heatmap │ Analytics          │
+                              │  Spam Filter  │ Resolve            │
+                              │  Fairness Audit Widget             │
+                              └───────────────────────────────────┘
 ```
+
+**Data Flow:**
+`Citizen submits grievance` → `Geo-tag + media embed` → `Upload to Cloudinary` → `AI classifies category + urgency + assigns priority with explanation` → `Stored in MongoDB` → `Admin notified` → `Admin resolves` → `Citizen status updated`
 
 ---
 
-## 🧠 How the AI Works
+## ✨ Features
 
-> 🤗 The ML model lives in a **separate Hugging Face repository**. The backend calls it via API.
+### 🧑‍💼 Citizen — Smart Lodge
+- Submit grievances with text, geo-tagged photo, and optional voice note
+- No mandatory login — name and area are sufficient
+- Real-time GPS coordinate capture via browser API
+- Reverse geocoding via OpenStreetMap — readable address embedded on image
+- Unique tracking ID generated per submission
+- "My History" page for tracking personal submissions
 
-### Grievance Classification Flow (BERT)
-```
-1. Backend receives raw grievance text from citizen
-2. Sends POST request → Hugging Face ML API
-3. BERT tokenizes text (padding=True, truncation=True)
-4. Model predicts probability across 8 categories
-5. Selects highest probability class C
-6. Assigns Priority:
-   IF C = "Fire" or "Accident"     → Priority = "Immediate"
-   IF C = "Water" or "Electricity" → Priority = "High"
-   ELSE                            → Priority = "Medium"
-7. Returns { Category, Priority } → Backend stores in MongoDB
-```
+### 🤖 AI Engine
+- Category classification into **8 departments**: Water Supply, Roads, Sanitation, Electricity, Garbage, Pollution, Public Transport, Stray Animals
+- Separate **urgency sentiment model** (Critical / High / Medium / Low)
+- **Dual-language models** — dedicated pipelines for English and Indic (Telugu/Hindi) inputs
+- Explainable outputs via **SHAP** and **Integrated Gradients** (X-PE module)
+- Multimodal support: audio transcription + image captioning as additional input
+- Processing time: ~0.4 seconds per query
 
-### Grievance Categories Supported
+### 👨‍💻 Admin Dashboard
+- Secure JWT login (admin role only)
+- Live heatmap of active complaint zones (OpenStreetMap)
+- Filter grievances by category, urgency, status, and area
+- One-click Resolve with admin reply
+- Spam detection and filtering
+- **Fairness Audit widget** (GFAS) — Geographic: 69 · Category: 90 · Language: 93
+- Real-time analytics: Total Filed, Active, Pending, Resolved, Critical
 
-Supported Categories (8):
-Water Supply · Roads · Sanitation · Electricity · Garbage · Pollution · Public Transport · Stray Animals
 ---
 
-## ⚙️ Tech Stack
+## 🛠️ Tech Stack
 
 ### Frontend
-![Next.js](https://img.shields.io/badge/Next.js_14-000000?style=flat-square&logo=next.js&logoColor=white)
-![React](https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)
-![Axios](https://img.shields.io/badge/Axios-5A29E4?style=flat-square&logo=axios&logoColor=white)
+| Technology | Purpose |
+|---|---|
+| Next.js 14 | Citizen portal + Admin dashboard |
+| Tailwind CSS | Responsive UI styling |
+| Lucide React | Icon library |
+| Axios | HTTP client |
 
 ### Backend
-![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=node.js&logoColor=white)
-![Express.js](https://img.shields.io/badge/Express.js-000000?style=flat-square&logo=express&logoColor=white)
-![JWT](https://img.shields.io/badge/JWT-000000?style=flat-square&logo=JSON%20web%20tokens&logoColor=white)
-![Mongoose](https://img.shields.io/badge/Mongoose-880000?style=flat-square)
+| Technology | Purpose |
+|---|---|
+| Node.js + Express.js | REST API server |
+| Mongoose | MongoDB ODM |
+| Multer | File upload handler |
+| JSON Web Token (JWT) | Authentication & authorization |
+| Cloudinary | Cloud media storage (images + audio) |
+| Resend | Email notifications |
 
-### AI / ML *(Separate — 🤗 Hugging Face)*
-![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
-![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)
-![HuggingFace](https://img.shields.io/badge/🤗_Hugging_Face-FFD21E?style=flat-square)
-![BERT](https://img.shields.io/badge/BERT-bert--base--uncased-blue?style=flat-square)
-![Scikit-learn](https://img.shields.io/badge/Scikit--learn-F7931E?style=flat-square&logo=scikit-learn&logoColor=white)
+### AI / ML
+| Technology | Purpose |
+|---|---|
+| Python 3.10 | AI microservice runtime |
+| PyTorch | Deep learning framework |
+| Hugging Face Transformers | BERT + IndicBERT model loading & inference |
+| SHAP | Explainability (category) |
+| Integrated Gradients | Explainability (urgency) |
+| Scikit-learn | Label encoding, preprocessing |
+| Pandas | Dataset management |
+| Flask | AI microservice HTTP server |
+| Docker | Containerized deployment on HF Spaces |
 
 ### Database & Storage
-![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=flat-square&logo=mongodb&logoColor=white)
-![Cloudinary](https://img.shields.io/badge/Cloudinary-3448C5?style=flat-square)
-
-### Deployment
-![Vercel](https://img.shields.io/badge/Frontend_+_Backend-Vercel-000000?style=flat-square&logo=vercel&logoColor=white)
-![HuggingFace](https://img.shields.io/badge/ML_Model-Hugging_Face-FFD21E?style=flat-square)
+| Technology | Purpose |
+|---|---|
+| MongoDB (NoSQL) | Primary database |
+| Cloudinary | Evidence images & audio files |
 
 ---
 
-## 📁 Project Structure
+## 🤖 AI Engine (Hugging Face)
 
-> This repo contains **Frontend + Backend only**. ML model is on Hugging Face.
+The AI microservice is **fully decoupled** from the Node.js backend and deployed independently on Hugging Face Spaces.
+
+**🔗 Live AI Endpoint:** [`https://mohanbot799s-civicconnect-ai-engine.hf.space`](https://mohanbot799s-civicconnect-ai-engine.hf.space)
+
+### AI Engine Structure
 
 ```
-Grievance-Portal/                  ← You are here
+civicconnect-ai-engine/
+├── 📁 civicconnect-bert-en/         # English category classification model
+├── 📁 civicconnect-bert-indic/      # Indic category classification model
+├── 📁 civicconnect-urgency-en/      # English urgency sentiment model
+├── 📁 civicconnect-urgency-indic/   # Indic urgency sentiment model
 │
-├── web-portal/                    # Next.js 14 Frontend
-│   ├── app/
-│   │   ├── page.jsx               # Home / Landing Page
-│   │   ├── lodge/
-│   │   │   └── SmartLodge.jsx     # Geo-Camera Capture Module
-│   │   ├── track/                 # Complaint Status Tracker
-│   │   └── admin/
-│   │       ├── login/             # JWT Admin Auth
-│   │       └── dashboard/         # Heatmap + Analytics
-│   ├── components/                # Reusable UI Components
-│   ├── public/                    # Static Assets
-│   └── tailwind.config.js
+├── 📁 classification/               # Classification inference scripts
+│   ├── bert_classify.py             # English BERT inference
+│   ├── bert_model.py                # English model definition
+│   ├── indic_bert_classify.py       # Indic BERT inference
+│   ├── indic_bert_model.py          # Indic model definition
+│   └── 📁 artifacts/                # Tokenizers, label maps, datasets
 │
-├── server/                        # Node.js + Express Backend
-│   ├── index.js                   # Entry Point + Cloudinary Config
-│   ├── routes/
-│   │   ├── grievances.js          # Grievance CRUD APIs
-│   │   ├── auth.js                # Admin JWT Auth
-│   │   └── notifications.js       # Email/SMS Alerts
-│   ├── models/
-│   │   ├── Grievance.js           # MongoDB Schema
-│   │   ├── User.js
-│   │   └── Department.js
-│   └── middleware/
-│       └── authMiddleware.js
+├── 📁 sentiment_analysis/           # Urgency/severity prediction
+│   ├── bert_predict.py              # English urgency inference
+│   ├── bert_model.py
+│   ├── indic_bert_predict.py        # Indic urgency inference
+│   ├── indic_bert_model.py
+│   └── 📁 artifacts/                # Urgency model weights + label maps
 │
-└── README.md
+├── 📁 xpe/                          # Explainability module
+│   ├── priority_engine.py           # Final priority decision logic
+│   ├── hybrid_explainer.py          # Combined SHAP + IG explainer
+│   ├── shap_category.py             # SHAP for category model
+│   ├── shap_urgency.py              # SHAP for urgency model
+│   └── integrated_gradients_explainer.py
+│
+├── 📁 gfas/                         # Fairness audit system
+│   ├── gfas_engine.py               # Core GFAS engine
+│   ├── fairness_audit.py
+│   ├── fairness_metrics.py
+│   ├── disparity_analysis.py
+│   └── report_generator.py
+│
+├── 📁 multi_modal/                  # Multimodal input processing
+│   ├── audio_to_text.py             # Voice note transcription
+│   └── image_to_text.py             # Image captioning
+│
+├── app.py                           # Flask API entry point
+├── Dockerfile                       # Container config for HF Spaces
+└── requirements.txt
 ```
 
-> 🤗 **ML Repo (Separate):** BERT model training, Flask/FastAPI inference, SHAP explainability → [Hugging Face Space](https://huggingface.co/spaces/mohanbot799s/civicconnect-ai-engine)
+---
+
+## 🧠 AI Classification Modules
+
+### 1. Category Classification
+Fine-tuned `bert-base-uncased` (English) and `IndicBERT` (Telugu/Hindi) classify grievances into 8 departments.
+
+**Supported Categories:** `Water Supply` · `Roads` · `Sanitation` · `Electricity` · `Garbage` · `Pollution` · `Public Transport` · `Stray Animals`
+
+### 2. Urgency Sentiment Analysis
+A separate BERT-based urgency model predicts complaint severity independently from category — enabling more nuanced prioritization.
+
+| Urgency Level | Examples |
+|---|---|
+| Critical | Fire, accident, medical emergency |
+| High | No water for 3+ days, power outage, sewage overflow |
+| Medium | Road damage, irregular garbage collection |
+| Low | Stray animals, minor complaints |
+
+### 3. Explainable Prioritization (X-PE)
+The X-PE module combines SHAP values and Integrated Gradients to produce a **human-readable explanation** for every priority decision — not just a label.
+
+```
+Input  →  Category Model (SHAP)  ─┐
+                                   ├→ Hybrid Explainer → Priority + Explanation
+Input  →  Urgency Model  (IG)   ──┘
+```
+
+### 4. Fairness Audit System (GFAS)
+Continuously monitors classification outputs for disparities across:
+- **Geographic regions** (Score: 69/100 — Moderate)
+- **Complaint categories** (Score: 90/100 — Equitable)
+- **Language groups** (Score: 93/100 — Equitable)
+- **Overall Fairness: 84/100 — Equitable**
+
+### 5. Multimodal Input
+- `audio_to_text.py` — Transcribes voice notes into text fed to the NLP pipeline
+- `image_to_text.py` — Generates captions from geo-tagged photos as supplemental context
+
+---
+
+## 🗄️ Database Design
+
+### MongoDB Collections
+
+**Users**
+```json
+{
+  "_id": "ObjectId",
+  "name": "String",
+  "email": "String (unique)",
+  "password": "String (hashed)",
+  "pincode": "String",
+  "role": "citizen | admin",
+  "createdAt": "Date"
+}
+```
+
+**Grievances**
+```json
+{
+  "_id": "ObjectId",
+  "citizenName": "String",
+  "userEmail": "String",
+  "area": "String",
+  "description": "String",
+  "category": "String (AI-assigned)",
+  "priority": "Critical | High | Medium | Low",
+  "status": "Pending | In Progress | Resolved | Spam",
+  "imageUrl": "String (Cloudinary URL)",
+  "audioUrl": "String (Cloudinary URL)",
+  "adminReply": "String",
+  "estimatedTime": "String",
+  "createdAt": "Date"
+}
+```
+
+**HotspotAlerts**
+```json
+{
+  "_id": "ObjectId",
+  "area": "String",
+  "category": "String",
+  "count": "Number",
+  "severity": "String",
+  "createdAt": "Date"
+}
+```
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) v18+
-- [MongoDB](https://www.mongodb.com/) (local or Atlas)
-- [Git](https://git-scm.com/)
 
-### 1️⃣ Clone the Repository
+- [Node.js](https://nodejs.org/) v18+
+- [Python](https://python.org/) 3.10+
+- [MongoDB](https://www.mongodb.com/) (local or Atlas)
+- [Cloudinary](https://cloudinary.com/) account (free tier works)
+
+### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/MOHAN799S/Grievance-Portal.git
-cd Grievance-Portal
+git clone https://github.com/MOHAN799S/grievance-portal.git
+cd grievance-portal
 ```
 
-### 2️⃣ Setup Backend (Node.js)
+### 2. Configure Environment Variables
+
+Create a `.env` file in the `server/` directory:
+
+```env
+# Server
+PORT=5000
+MONGO_URI=your_mongodb_connection_string
+
+# JWT
+JWT_SECRET=your_jwt_secret_key
+
+# Cloudinary
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
+# AI Microservice
+AI_ENGINE_URL=https://mohanbot799s-civicconnect-ai-engine.hf.space
+
+# Email (Resend)
+RESEND_API_KEY=your_resend_api_key
+```
+
+### 3. Install & Run Backend
 
 ```bash
 cd server
 npm install
-```
-
-Create a `.env` file in `/server`:
-
-```env
-PORT=5000
-MONGO_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret_key
-CLOUDINARY_CLOUD_NAME=your_cloudinary_name
-CLOUDINARY_API_KEY=your_cloudinary_key
-CLOUDINARY_API_SECRET=your_cloudinary_secret
-HUGGINGFACE_API_URL=your_huggingface_space_api_url
-```
-
-Start the backend:
-```bash
 node index.js
+# Server running on http://localhost:5000
 ```
 
-### 3️⃣ Setup Frontend (Next.js)
+### 4. Install & Run Frontend
 
 ```bash
 cd web-portal
 npm install
 npm run dev
+# App running on http://localhost:3000
 ```
 
-App runs at **http://localhost:3000**
+### 5. AI Microservice
 
-### 4️⃣ ML Model (Hugging Face — Separate Repo)
+The AI engine is **pre-deployed on Hugging Face Spaces** and ready to use via the `AI_ENGINE_URL` env variable. No local setup needed.
 
-> The AI classification model is **not part of this repository**.
-> It is deployed as an API on 🤗 Hugging Face Spaces.
-> Simply add your Hugging Face Space URL to `HUGGINGFACE_API_URL` in the `.env` file above.
->
-> 👉 [View ML Model on Hugging Face](https://huggingface.co/spaces/mohanbot799s/civicconnect-ai-engine)
+To run locally (optional):
 
----
+```bash
+# Clone the AI engine separately
+git clone https://huggingface.co/spaces/mohanbot799s/civicconnect-ai-engine
+cd civicconnect-ai-engine
+pip install -r requirements.txt
+python app.py
+# Flask AI service running on http://localhost:7860
+```
 
-## 📊 Performance & Results
+### 6. Access the App
 
-| Metric | Result |
-|--------|--------|
-| 🎯 AI Classification Accuracy | **85–90%** |
-| ⚡ AI Prediction Time | **~0.4 seconds** |
-| 📬 Full Submission Response | **~1.5 seconds** |
-| 👥 Concurrent Users | **1,000+** |
-| ✅ Test Cases Passed | **28 / 30** |
-| 🔄 Target Uptime | **99%** |
+| Interface | URL |
+|---|---|
+| Citizen Portal | `http://localhost:3000` |
+| Grievance Submission | `http://localhost:3000/citizen/lodge` |
+| My History | `http://localhost:3000/citizen/history` |
+| Admin Dashboard | `http://localhost:3000/admin/dashboard` |
+| AI Service (Live) | `https://mohanbot799s-civicconnect-ai-engine.hf.space` |
 
-### Old System vs Civic Connect
-
-| Feature | Old Manual System | Civic Connect |
-|---------|------------------|---------------|
-| Classification | Manual by clerks | ✅ Automated BERT AI |
-| Prioritization | First-Come-First-Serve | ✅ Severity-Based AI |
-| Evidence | Basic image upload | ✅ Geo-Tagged + Timestamped |
-| Citizen Access | Login mandatory | ✅ Token-Free |
-| Storage | Local server | ✅ Cloudinary Cloud |
-| ML Hosting | — | ✅ Hugging Face |
-| Transparency | None | ✅ SHAP Explainable AI |
+> **Allow camera and location permissions** in your browser when prompted on the Lodge page.
 
 ---
 
-## 🔬 Testing
+## 📡 API Reference
 
-| ID | Description | Input | Expected | Status |
-|----|-------------|-------|----------|--------|
-| TC-01 | Citizen Lodge (No Auth) | "Broken Road" + Photo | Data in MongoDB | ✅ Pass |
-| TC-02 | Geo-Tagging Accuracy | Camera Permission | Address on image | ✅ Pass |
-| TC-03 | AI Classification | "No power since morning" | Electricity, High | ✅ Pass |
-| TC-04 | Admin Login | Valid credentials | Dashboard access | ✅ Pass |
-| TC-05 | Spam Detection | "Mark as Spam" | Moved to spam | ✅ Pass |
-| TC-06 | Audio Upload | .webm file | Stored in Cloudinary | ✅ Pass (after fix) |
+### Auth Routes
 
-**28/30 test cases passed.** 2 initially failed on audio format — fixed by updating Cloudinary config.
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `POST` | `/api/auth/signup` | Public | Register new citizen |
+| `POST` | `/api/auth/login` | Public | Citizen login → returns JWT |
+| `POST` | `/api/admin/login` | Public | Admin login → strict role check |
+
+### Grievance Routes
+
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `GET` | `/api/grievances` | Public | Fetch grievances (filter by email) |
+| `POST` | `/api/grievances/submit` | Public | Submit grievance with media |
+| `PUT` | `/api/grievances/:id` | Admin JWT | Resolve grievance + admin reply |
+| `DELETE` | `/api/grievances/:id` | Admin JWT | Delete grievance |
+
+### AI Engine Routes (Hugging Face)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/classify` | Text → Category + Priority + Explanation |
+| `GET` | `/health` | Service health check |
+
+**Example Request:**
+```json
+POST https://mohanbot799s-civicconnect-ai-engine.hf.space/classify
+{
+  "text": "No water supply in our area since 3 days",
+  "language": "en"
+}
+```
+
+**Example Response:**
+```json
+{
+  "category": "Water Supply",
+  "urgency": "High",
+  "priority": "High",
+  "confidence": 0.923,
+  "explanation": "Keywords 'no water supply' and 'since 3 days' indicate a critical infrastructure failure affecting daily life."
+}
+```
+
+### Auth Headers (Admin Routes)
+```
+Authorization: Bearer <jwt_token>
+```
 
 ---
 
-## 🔮 Future Scope
+## 🧪 Testing & Results
 
-| Enhancement | Description |
-|-------------|-------------|
-| 🗣️ Multilingual Voice AI | Speech-to-Text for Telugu & Hindi audio |
-| ⛓️ Blockchain | Immutable tamper-proof resolved complaint records |
-| 🌐 IoT Integration | Smart City sensors auto-generate tickets |
-| 📱 Mobile App | Native Android/iOS apps |
-| 🌍 More Languages | IndicBERT for all 22 Indian scheduled languages |
-| 📉 Predictive Analytics | Forecast complaint hotspots before they surge |
+### Test Cases Summary
+
+| Test ID | Description | Expected | Status |
+|---|---|---|---|
+| TC-01 | Citizen lodge without login | Data saved to MongoDB | ✅ Pass |
+| TC-02 | Geo-tagging accuracy | Coords + address on image | ✅ Pass |
+| TC-03 | English AI classification | Category: Electricity, Priority: High | ✅ Pass |
+| TC-04 | Indic language classification | Correct Telugu/Hindi routing | ✅ Pass |
+| TC-05 | Admin login + JWT validation | Dashboard access granted | ✅ Pass |
+| TC-06 | Spam detection | Moved to spam folder | ✅ Pass |
+| TC-07 | GFAS fairness audit | Scores returned correctly | ✅ Pass |
+| TC-08 | Concurrent load (100 users) | No crash, stable response | ✅ Pass |
+
+**Total Test Cases:** 30 · **Passed:** 28 · **Failed:** 2 · **Success Rate: 93%**
+
+---
+
+## 📊 Performance Metrics
+
+| Metric | Value |
+|---|---|
+| AI Classification Accuracy | 85–92% (validation set) |
+| Grievance Submission Response Time | ~1.5 seconds (incl. image upload) |
+| AI Prediction Time | ~0.4 seconds per query |
+| Concurrent Request Capacity | 100+ (stress tested) |
+| Fairness — Geographic | 69 / 100 (Moderate) |
+| Fairness — Category | 90 / 100 (Equitable) |
+| Fairness — Language | 93 / 100 (Equitable) |
+| Overall Fairness Score | **84 / 100 (Equitable)** |
+| Test Cases Passed | 28 / 30 (93%) |
+
+### Civic Connect vs. Existing Systems
+
+| Feature | CPGRAMS (Manual) | Civic Connect |
+|---|---|---|
+| Classification | Manual clerks | Automated AI (BERT) |
+| Prioritization | First-Come-First-Serve | AI severity-based |
+| Evidence | Basic image upload | Geo-tagged + timestamped |
+| Language Support | English + Hindi | English, Telugu, Hindi |
+| Explainability | None | SHAP + Integrated Gradients |
+| Bias Monitoring | None | Real-time GFAS |
+| Citizen Access | Mandatory login | Token-free |
+
+---
+
+## ⚠️ Limitations
+
+1. **Dataset Bias** — BERT models may struggle with unfamiliar regional slang or dialects not present in training data
+2. **Internet Dependency** — Cloudinary, OpenStreetMap, and Hugging Face services require stable connectivity
+3. **GPS Accuracy** — In dense urban environments or indoors, GPS accuracy can vary ±10–20 meters
+4. **Scalability** — Single-instance setup requires load balancing beyond 1,000 concurrent users
+5. **Mixed Language (Code-Switching)** — Hinglish or Telugu-English mixed inputs show reduced classification accuracy
+6. **Privacy** — Geo-tagged images and personal descriptions constitute PII; full compliance required before production deployment
+
+---
+
+## 🔭 Future Scope
+
+- **Multilingual Voice AI** — Speech-to-Text for Telugu and Hindi voice complaints
+- **Blockchain Audit Trail** — Immutable grievance resolution records for tamper-proof accountability
+- **IoT Integration** — Auto-generated complaints from smart city sensors
+- **Predictive Analytics** — Hotspot prediction model to proactively identify complaint surge areas
+- **Mobile Application** — Android/iOS app with push notifications and offline draft support
+- **Government Portal Integration** — Direct API integration with CPGRAMS and state e-governance portals
 
 ---
 
 ## 👥 Team
 
-| Name | Roll Number | Role |
-|------|------------|------|
-| **Kunche Alekhya** | 22MH1A0531 | Frontend Developer |
-| **Sangidi Mohan Lakshman** | 22MH1A0562 | Backend Developer & AI Integration |
-| **Kasindala Pardhasaradhi** | 22MH1A0525 | AI/ML Engineer |
-| **Digumarthi Jaya Phani Srinivas** | 22MH1A0514 | Full Stack & System Design |
+| Name | Role | Reg. No. |
+|---|---|---|
+| **Sangidi Mohan Lakshman** | Full Stack + AI Integration | 22MH1A0562 |
+| **Kunche Alekhya** | Frontend + Documentation | 22MH1A0531 |
+| **Kasindala Pardhasaradhi** | Backend + Database | 22MH1A0525 |
+| **Digumarthi Jaya Phani Srinivas** | AI Module + Testing | 22MH1A0514 |
 
-**Project Guide:** Mr. S. Chittibabulu M.Tech (Ph.D), Associate Professor, Dept. of CSE
-**Head of Department:** Dr. G. S. N. Murthy M.Tech Ph.D
-**Institution:** Aditya College of Engineering & Technology (A), Surampalem
+**Project Guide:** Mr. S. Chittibabulu, M.Tech (Ph.D), Assistant Professor, Dept. of CSE
 
+**Institution:** Aditya College of Engineering & Technology, Surampalem
+*(Autonomous · AICTE Approved · NBA & NAAC A+ · Affiliated to JNTUK)*
 
 ---
-## 📄 Publication
 
-This project was accepted and published as a peer-reviewed research article:
+## 📄 Publication
 
 > **S. Mohan Lakshman, A. Alekhya, K. Pardhasaradhi, D. J. Phani Srinivas, S. Chittibabulu**
 > *"Multimodal artificial intelligence priorities and analysis portal in citizen services"*
 > International Journal of Science and Research Archive (IJSRA), Vol. 18, Issue 3, pp. 645–651, 2026
 > **DOI:** [10.30574/ijsra.2026.18.3.0473](https://doi.org/10.30574/ijsra.2026.18.3.0473)
-> **Received:** 29 January 2026 · **Revised:** 07 March 2026 · **Accepted:** 09 March 2026
+> Received: 29 Jan 2026 · Revised: 07 Mar 2026 · Accepted: 09 Mar 2026
 
 ---
 
-## 🙏 Acknowledgements
+## 📜 License
 
-- **Mr. S. Chittibabulu M.Tech (Ph.D)** — Project Guide
-- **Dr. G. S. N. Murthy** — Head of Department, CSE
-- **Dr. A. Ramesh** — Principal, Aditya College of Engineering & Technology
-- **Dr. P.S.V.V.S. Ravi Kumar** — Dean (Academics)
-- All faculty members and lab programmers of the CSE Department
-- Management of Aditya College of Engineering & Technology
-
----
-
-## 📚 References
-
-1. Devlin, J., et al. *"BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding."* NAACL, 2019.
-2. Vaswani, A., et al. *"Attention Is All You Need."* NeurIPS, 2017.
-3. [Next.js Documentation](https://nextjs.org/docs)
-4. [Cloudinary API Reference](https://cloudinary.com/documentation)
-5. [OpenStreetMap Nominatim Usage Policy](https://operations.osmfoundation.org/policies/nominatim/)
-6. [Hugging Face Transformers](https://huggingface.co/docs/transformers)
+This project is licensed under the [MIT License](LICENSE).
 
 ---
 
 <div align="center">
 
-**⭐ If you found this project useful, please give it a star!**
+**Built with ❤️ at Aditya College of Engineering & Technology, Surampalem**
 
-[![GitHub stars](https://img.shields.io/github/stars/MOHAN799S/Grievance-Portal?style=social)](https://github.com/MOHAN799S/Grievance-Portal/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/MOHAN799S/Grievance-Portal?style=social)](https://github.com/MOHAN799S/Grievance-Portal/network/members)
-
-<br/>
-
-Made with ❤️ by Team Civic Connect | Aditya College of Engineering & Technology (A)
-
-🌐 [Live Demo](https://grievance-portal-one.vercel.app/) • 💻 [GitHub](https://github.com/MOHAN799S/Grievance-Portal) • 🤗 [ML Model on Hugging Face](https://huggingface.co/spaces/mohanbot799s/civicconnect-ai-engine)
+If this project helped you, please ⭐ star the repository!
 
 </div>
